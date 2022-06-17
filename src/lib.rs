@@ -18,8 +18,8 @@ pub use frame_support::{
 #[cfg(test)]
 mod tests;
 
-// #[cfg(feature = "runtime-benchmarks")]
-// mod benchmarking;
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -52,24 +52,24 @@ pub mod pallet {
 		_,
 		Blake2_256,
 		PlanId,
-		Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
+		SubscriptionPart<T::BlockNumber, BalanceOf<T>, T::AccountId>,
 		OptionQuery,
 	>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn subscription_nonce)]
-	pub type SubscriptionNonce<T: Config> = StorageValue<_, SubscriptionId, ValueQuery>;
+	pub type SubscriptionPartNonce<T: Config> = StorageValue<_, SubscriptionId, ValueQuery>;
 
 	// the vector should ALWAYS be sorted from biggest to smallest block_number
 	#[pallet::storage]
 	#[pallet::unbounded]
 	#[pallet::getter(fn subscriptions)]
-	pub type Subscriptions<T: Config> = StorageValue<
+	pub type SubscriptionParts<T: Config> = StorageValue<
 		_,
 		Vec<(
 			T::BlockNumber,
 			(
-				Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
+				SubscriptionPart<T::BlockNumber, BalanceOf<T>, T::AccountId>,
 				T::AccountId,
 			),
 		)>,
@@ -104,7 +104,7 @@ pub mod pallet {
 		fn on_initialize(n: T::BlockNumber) -> Weight {
 			let _weight = 0;
 
-			let mut subs = unwrap_or_return!(Subscriptions::<T>::get(), 0); // 1 read
+			let mut subs = unwrap_or_return!(SubscriptionParts::<T>::get(), 0); // 1 read
 			let tmp = subs.clone();
 			let (exec_block, (_, _)) = unwrap_or_return!(tmp.last(), 0); // 1 unwrap
 			if n != *exec_block {
@@ -137,7 +137,7 @@ pub mod pallet {
 					}
 				}
 				if (unwrap_or_return!(subs.last(), 0)).0 == *exec_block {
-					Subscriptions::<T>::set(Some(subs));
+					SubscriptionParts::<T>::set(Some(subs));
 					return 0 // WEIGHT
 				}
 			}
@@ -147,9 +147,9 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		#[pallet::weight(1)]
-		pub fn create_subsciption_plan(
+		pub fn create_subscription_plan(
 			origin: OriginFor<T>,
-			plan: Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
+			plan: SubscriptionPart<T::BlockNumber, BalanceOf<T>, T::AccountId>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
@@ -170,7 +170,7 @@ pub mod pallet {
 		}
 
 		#[pallet::weight(1)]
-		pub fn delete_subsciption_plan(origin: OriginFor<T>, plan_id: Nonce) -> DispatchResult {
+		pub fn delete_subscription_plan(origin: OriginFor<T>, plan_id: Nonce) -> DispatchResult {
 			ensure_signed(origin)?;
 
 			if Self::plans(plan_id).is_none() {
@@ -199,7 +199,7 @@ pub mod pallet {
 		#[pallet::weight(1)]
 		pub fn subscribe(
 			_origin: OriginFor<T>,
-			_plan: Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
+			_plan: SubscriptionPart<T::BlockNumber, BalanceOf<T>, T::AccountId>,
 		) -> DispatchResult {
 			// todo:
 			// signed ?
