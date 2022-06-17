@@ -32,7 +32,7 @@ pub mod pallet {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
 		/// The trait to manage funds
-		type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
+		type Currency: Currency<Self::AccountId>;
 		/// The maximum amount of metadata
 		#[pallet::constant]
 		type MaxMetadataLength: Get<u32>;
@@ -89,46 +89,8 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(n: T::BlockNumber) -> Weight {
-			let _weight = 0;
-
-			let mut subs = unwrap_or_return!(Subscriptions::<T>::get(), 0); // 1 read
-			let tmp = subs.clone();
-			let (exec_block, (_, _)) = unwrap_or_return!(tmp.last(), 0); // 1 unwrap
-			if n != *exec_block {
-				return 0
-			}
-			loop {
-				if let Some((b, (mut sub, account))) = subs.pop() {
-					if b == *exec_block {
-						if let Some(val) = sub.remaining_payments {
-							if val == 0 {
-								subs.pop();
-								continue
-							}
-						}
-						if T::Currency::transfer(
-							&account,
-							&sub.beneficiary,
-							sub.amount,
-							ExistenceRequirement::AllowDeath,
-						)
-						.is_err()
-						{
-							continue
-						}
-						sub.remaining_payments = sub.remaining_payments.map(|amount| amount - 1);
-						let new_block = n + sub.frequency;
-						let new_index =
-							subs.binary_search_by(|(b, _)| b.cmp(&new_block)).unwrap_or_else(|e| e);
-						subs.insert(new_index, (new_block, (sub.clone(), account.clone())));
-					}
-				}
-				if (unwrap_or_return!(subs.last(), 0)).0 == *exec_block {
-					Subscriptions::<T>::set(Some(subs));
-					return 0 // WEIGHT
-				}
-			}
-		}
+            Self::do_execute_subscriptions(n)
+        }
 	}
 
 	#[pallet::call]
@@ -196,4 +158,45 @@ pub mod pallet {
 			Ok(())
 		}
 	}
+
+	impl<T: Config> Pallet<T> {
+        pub fn do_execute_subscriptions(n: T::BlockNumber) -> Weight {
+            let mut subs = unwrap_or_return!(Subscriptions::<T>::get(), 0); // 1 read
+            let tmp = subs.clone();
+            let (exec_block, (_, _)) = unwrap_or_return!(tmp.last(), 0); // 1 unwrap
+            if n != *exec_block {
+                return 0
+            }
+            loop {
+                if let Some((b, (mut sub, account))) = subs.pop() {
+                    if b == *exec_block {
+                        if let Some(val) = sub.remaining_payments {
+                            if val == 0 {
+                                continue
+                            }
+                        }
+                        if T::Currency::transfer(
+                            &account,
+                            &sub.beneficiary,
+                            sub.amount,
+                            ExistenceRequirement::AllowDeath,
+                        )
+                        .is_err()
+                        {
+                            continue
+                        }
+                        sub.remaining_payments = sub.remaining_payments.map(|amount| amount - 1);
+                        let new_block = n + sub.frequency;
+                        let new_index =
+                            subs.binary_search_by(|(b, _)| b.cmp(&new_block)).unwrap_or_else(|e| e);
+                        subs.insert(new_index, (new_block, (sub.clone(), account.clone())));
+                    }
+                }
+                if (unwrap_or_return!(subs.last(), 0)).0 == *exec_block {
+                    Subscriptions::<T>::set(Some(subs));
+                    return 0
+                }
+            }
+        }
+    }
 }
