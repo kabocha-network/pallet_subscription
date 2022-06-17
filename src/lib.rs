@@ -47,7 +47,7 @@ pub mod pallet {
 	pub type PlanNonce<T: Config> = StorageValue<_, PlanId, ValueQuery>;
 
 	#[pallet::storage]
-	#[pallet::getter(fn subscription_plans)]
+	#[pallet::getter(fn plans)]
 	pub type Plans<T: Config> = StorageMap<
 		_,
 		Blake2_256,
@@ -76,14 +76,27 @@ pub mod pallet {
 	>;
 
 	#[pallet::event]
-	// #[pallet::generate_deposit(pub(super) fn deposit_event)]
+	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		SomethingStored(u32, T::AccountId),
+		/// a plan have been generated
+		/// [plan nonce]
+		PlanGenerated(PlanId),
+		/// a plan have been removed
+		/// [plan nonce]
+		PlanRemoved(PlanId),
+		/// an user subscribed to a plan
+		/// [user, plan nonce, subscription nonce]
+		SubscribedToPlan(T::AccountId, PlanId, SubscriptionId),
 	}
 
 	#[pallet::error]
 	pub enum Error<T> {
-		NoneValue,
+		/// Invalid frequency in subscription: it must be greater than 0
+		BadFrequency,
+		/// the calling user doesnt have the permission to do this
+		Unauthorized,
+		/// The plan does not exist
+		UnknownPlan,
 	}
 
 	#[pallet::hooks]
@@ -135,41 +148,52 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		#[pallet::weight(1)]
 		pub fn create_subsciption_plan(
-			_origin: OriginFor<T>,
-			_plan: Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
+			origin: OriginFor<T>,
+			plan: Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
 		) -> DispatchResult {
-			// maybe make a new function for Subscription, so `plan` is already valid 100%
-			//
-			//
-			// todo:
-			// signed ?
-			// valid plan ?
-			//
-			// -> push the plan to the storage
+			let who = ensure_signed(origin)?;
+
+			if plan.frequency == 0u32.into() {
+				return Err(Error::<T>::BadFrequency.into())
+			}
+			if plan.beneficiary != who {
+				return Err(Error::<T>::Unauthorized.into())
+			}
+
+			let nonce = Self::plan_nonce();
+
+			PlanNonce::<T>::put(nonce.saturating_add(1));
+			Plans::<T>::insert(nonce, plan);
+
+			Self::deposit_event(Event::<T>::PlanGenerated(nonce));
 			Ok(())
 		}
 
 		#[pallet::weight(1)]
-		pub fn delete_subsciption_plan(_origin: OriginFor<T>, _plan_id: Nonce) -> DispatchResult {
-			// better ? 5 parameters but we can check, better option if no plan.new() function
-			//
-			//
-			// todo:
-			// signed ?
-			// plan exist ?
-			//
-			// -> remove the plan to the storage
+		pub fn delete_subsciption_plan(origin: OriginFor<T>, plan_id: Nonce) -> DispatchResult {
+			ensure_signed(origin)?;
+
+			if Self::plans(plan_id).is_none() {
+				return Err(Error::<T>::UnknownPlan.into())
+			}
+
+			Plans::<T>::remove(plan_id);
+			Self::deposit_event(Event::<T>::PlanRemoved(plan_id));
 			Ok(())
 		}
 
 		#[pallet::weight(1)]
-		pub fn subscribe_to_plan(_origin: OriginFor<T>, _plan_id: Nonce) -> DispatchResult {
-			// todo:
-			// signed ?
-			// plan exist ?
-			//
-			// -> create entry in storage
-			Ok(())
+		pub fn subscribe_to_plan(origin: OriginFor<T>, plan_id: Nonce) -> DispatchResult {
+			ensure_signed(origin)?;
+
+			if let Some(_plan) = Self::plans(plan_id) {
+				////////////////////
+				// call an inner_subscribe to avoid calling another extrinsic
+				////////////////////
+				Ok(())
+			} else {
+				Err(Error::<T>::UnknownPlan.into())
+			}
 		}
 
 		#[pallet::weight(1)]
