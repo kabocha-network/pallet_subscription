@@ -84,7 +84,7 @@ parameter_types! {
 impl pallet_subscription::Config for Test {
 	type Currency = Balances;
 	type Event = Event;
-	type MaxMetadataLength = MaxMetadataLength;
+	type WeightInfo = ();
 }
 
 type AccountPublic = <MultiSignature as Verify>::Signer;
