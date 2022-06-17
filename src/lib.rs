@@ -1,5 +1,4 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![feature(drain_filter)]
 #![allow(clippy::type_complexity)]
 
 pub use pallet::*;
