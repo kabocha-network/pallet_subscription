@@ -5,7 +5,16 @@ pub use pallet::*;
 pub mod types;
 pub use types::*;
 
-pub use frame_support::traits::tokens::currency::{Currency, ReservableCurrency};
+
+pub use frame_support::{
+	storage::IterableStorageMap,
+	traits::tokens::{
+		currency::{Currency, ReservableCurrency},
+		ExistenceRequirement,
+	},
+	ReversibleStorageHasher,
+};
+
 
 // #[cfg(test)]
 // mod mock;
@@ -21,6 +30,7 @@ pub mod pallet {
 	use super::*;
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
+	use frame_support::sp_runtime::traits::Zero;
 
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
@@ -39,25 +49,33 @@ pub mod pallet {
 
 	#[pallet::storage]
 	#[pallet::getter(fn plan_nonce)]
-	pub type PlanNonce<T> = StorageValue<_, PlanId, ValueQuery>;
+	pub type PlanNonce<T: Config> = StorageValue<_, PlanId, ValueQuery>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn subscription_plans)]
-	pub type Plans<T: Config> = StorageMap<_, Blake2_256, PlanId, Subscription<T>, OptionQuery>;
+	pub type Plans<T: Config> = StorageMap<
+		_,
+		Blake2_256,
+		PlanId,
+		Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
+		OptionQuery,
+	>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn subscription_nonce)]
-	pub type SubscriptionNonce<T> = StorageValue<_, SubscriptionId, ValueQuery>;
+	pub type SubscriptionNonce<T: Config> = StorageValue<_, SubscriptionId, ValueQuery>;
 
 	#[pallet::storage]
+	#[pallet::unbounded]
 	#[pallet::getter(fn subscriptions)]
 	pub type Subscriptions<T: Config> =
-		StorageMap<_, Blake2_256, SubscriptionId, Subscription<T>, OptionQuery>;
+	StorageMap<_, Blake2_256, T::BlockNumber, Vec<(Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>, T::AccountId)>, OptionQuery>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
 		SomethingStored(u32, T::AccountId),
+		SubscriptionStored(T::BlockNumber, BalanceOf<T>),
 	}
 
 	#[pallet::error]
@@ -81,63 +99,23 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		#[pallet::weight(1)]
-		pub fn create_subsciption_plan(
-			origin: OriginFor<T>,
-			plan: Subscription<T>,
-		) -> DispatchResult {
-			// maybe make a new function for Subscription, so `plan` is already valid 100%
-			//
-			//
-			// todo:
-            // signed ?
-            // valid plan ?
-            //
-			// -> push the plan to the storage
+		pub fn subscribe(origin: OriginFor<T>, to: T::AccountId,
+					 amount: BalanceOf<T>, frequency: T::BlockNumber) -> DispatchResult {
+			ensure_signed(origin)?;
+
+			ensure!(!frequency.is_zero() && !amount.is_zero(), "frequency or amount is 0");
+
+			let new_to = to.clone();
+			let mut sub = Subscription::<T, T, T>::new(frequency, amount, None, new_to);
+
+			let mut vec: Vec<(Subscription<T, T, T>, T::AccountId)> = Vec::new();
+			vec.push((sub, to));
+
+			<Subscriptions<T>>::insert(frequency, vec);
+			Self::deposit_event(Event::SubscriptionStored(frequency, amount));
 			Ok(())
 		}
 
-		#[pallet::weight(1)]
-		pub fn delete_subsciption_plan(origin: OriginFor<T>, plan_id: Nonce) -> DispatchResult {
-			// better ? 5 parameters but we can check, better option if no plan.new() function
-			//
-			//
-			// todo:
-            // signed ?
-            // plan exist ?
-            //
-			// -> remove the plan to the storage
-			Ok(())
-		}
-
-		#[pallet::weight(1)]
-		pub fn subscribe_to_plan(origin: OriginFor<T>, plan_id: Nonce) -> DispatchResult {
-			// todo:
-			// signed ?
-            // plan exist ?
-            //
-			// -> create entry in storage
-			Ok(())
-		}
-
-		#[pallet::weight(1)]
-		pub fn subscribe(origin: OriginFor<T>, plan: Subscription) -> DispatchResult {
-			// todo:
-			// signed ?
-            // valid subscription ?
-            //
-			// -> create entry in storage
-			Ok(())
-		}
-
-		#[pallet::weight(1)]
-		pub fn unsubscribe(origin: OriginFor<T>, other: T::AccountId) -> DispatchResult {
-			// signed by the subscriber ?
-            // yes -> subscriber is subscribed to other ?
-            //        delete from storage
-            // no -> signed by beneficiary ?
-            //       other is subscribed to beneficiary ?
-            //       delete from storage
-			Ok(())
-		}
 	}
+
 }
