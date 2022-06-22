@@ -18,14 +18,6 @@ pub struct Subscription<BlockNumber, Balance, AccountId> {
 	pub beneficiary: AccountId,
 }
 
-impl<T: Config> Subscription<T, T, T> {
-
-	pub fn new(frequency: T::BlockNumber, amount: BalanceOf<T>, remaining_payments: Option<u32>, beneficiary: T::AccountId) -> Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId> {
-
-		Subscription { frequency, amount, remaining_payments , beneficiary }
-
-	}
-}
 
 
 #[macro_export]

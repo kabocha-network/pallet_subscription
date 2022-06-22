@@ -101,14 +101,20 @@ pub mod pallet {
 		#[pallet::weight(1)]
 		pub fn subscribe(origin: OriginFor<T>, to: T::AccountId,
 					 amount: BalanceOf<T>, frequency: T::BlockNumber) -> DispatchResult {
+
 			ensure_signed(origin)?;
 
+			// check if subscription is valid
 			ensure!(!frequency.is_zero() && !amount.is_zero(), "frequency or amount is 0");
 
-			let new_to = to.clone();
-			let mut sub = Subscription::<T, T, T>::new(frequency, amount, None, new_to);
+			let sub = Subscription {
+				frequency,
+				amount,
+				remaining_payments: None,
+				beneficiary: to.clone(),
+			};
 
-			let mut vec: Vec<(Subscription<T, T, T>, T::AccountId)> = Vec::new();
+			let mut vec: Vec<(Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>, T::AccountId)> = Vec::new();
 			vec.push((sub, to));
 
 			<Subscriptions<T>>::insert(frequency, vec);
