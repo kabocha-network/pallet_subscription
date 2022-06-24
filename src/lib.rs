@@ -3,6 +3,11 @@
 pub use pallet::*;
 
 pub mod types;
+
+#[cfg(test)]
+mod tests;
+
+
 pub use types::*;
 
 
@@ -123,5 +128,4 @@ pub mod pallet {
 		}
 
 	}
-
 }
