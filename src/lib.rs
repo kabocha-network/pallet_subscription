@@ -1,0 +1,197 @@
+#![cfg_attr(not(feature = "std"), no_std)]
+#![allow(clippy::type_complexity)]
+
+pub use pallet::*;
+
+pub mod types;
+pub use types::*;
+
+pub mod weights;
+pub use weights::*;
+
+pub use frame_support::{
+	storage::IterableStorageMap,
+	traits::tokens::{
+		currency::{Currency, ReservableCurrency},
+		ExistenceRequirement,
+	},
+	ReversibleStorageHasher,
+};
+
+#[cfg(test)]
+mod tests;
+
+// #[cfg(feature = "runtime-benchmarks")]
+// mod benchmarking;
+
+#[frame_support::pallet]
+pub mod pallet {
+	use super::*;
+	use frame_support::pallet_prelude::*;
+	use frame_system::pallet_prelude::*;
+
+	#[pallet::config]
+	pub trait Config: frame_system::Config {
+		/// Because this pallet emits events, it depends on the runtime's definition of an event.
+		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+		/// The trait to manage funds
+		type Currency: Currency<Self::AccountId>;
+
+		/// Weigths module
+		type WeightInfo: WeightInfo;
+	}
+
+	#[pallet::pallet]
+	#[pallet::generate_store(pub(super) trait Store)]
+	pub struct Pallet<T>(_);
+
+	#[pallet::storage]
+	#[pallet::getter(fn plan_nonce)]
+	pub type PlanNonce<T: Config> = StorageValue<_, PlanId, ValueQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn subscription_plans)]
+	pub type Plans<T: Config> = StorageMap<
+		_,
+		Blake2_256,
+		PlanId,
+		Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
+		OptionQuery,
+	>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn subscription_nonce)]
+	pub type SubscriptionNonce<T: Config> = StorageValue<_, SubscriptionId, ValueQuery>;
+
+	#[pallet::storage]
+	#[pallet::unbounded]
+	#[pallet::getter(fn subscriptions)]
+	pub type Subscriptions<T: Config> = StorageMap<
+		_,
+		Blake2_256,
+		T::BlockNumber,
+		Vec<(
+			Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
+			T::AccountId,
+		)>,
+		OptionQuery,
+	>;
+
+	#[pallet::event]
+	// #[pallet::generate_deposit(pub(super) fn deposit_event)]
+	pub enum Event<T: Config> {
+		SomethingStored(u32, T::AccountId),
+	}
+
+	#[pallet::error]
+	pub enum Error<T> {
+		NoneValue,
+	}
+
+	#[pallet::hooks]
+	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+		fn on_initialize(n: T::BlockNumber) -> Weight {
+			Self::do_execute_subscriptions(n)
+		}
+	}
+
+	#[pallet::call]
+	impl<T: Config> Pallet<T> {
+		#[pallet::weight(1)]
+		pub fn create_subsciption_plan(
+			_origin: OriginFor<T>,
+			_plan: Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
+		) -> DispatchResult {
+			// maybe make a new function for Subscription, so `plan` is already valid 100%
+			//
+			//
+			// todo:
+			// signed ?
+			// valid plan ?
+			//
+			// -> push the plan to the storage
+			Ok(())
+		}
+
+		#[pallet::weight(1)]
+		pub fn delete_subsciption_plan(_origin: OriginFor<T>, _plan_id: Nonce) -> DispatchResult {
+			// better ? 5 parameters but we can check, better option if no plan.new() function
+			//
+			//
+			// todo:
+			// signed ?
+			// plan exist ?
+			//
+			// -> remove the plan to the storage
+			Ok(())
+		}
+
+		#[pallet::weight(1)]
+		pub fn subscribe_to_plan(_origin: OriginFor<T>, _plan_id: Nonce) -> DispatchResult {
+			// todo:
+			// signed ?
+			// plan exist ?
+			//
+			// -> create entry in storage
+			Ok(())
+		}
+
+		#[pallet::weight(1)]
+		pub fn subscribe(
+			_origin: OriginFor<T>,
+			_plan: Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
+		) -> DispatchResult {
+			// todo:
+			// signed ?
+			// valid subscription ?
+			//
+			// -> create entry in storage
+			Ok(())
+		}
+
+		#[pallet::weight(1)]
+		pub fn unsubscribe(_origin: OriginFor<T>, _other: T::AccountId) -> DispatchResult {
+			// signed by the subscriber ?
+			// yes -> subscriber is subscribed to other ?
+			//        delete from storage
+			// no -> signed by beneficiary ?
+			//       other is subscribed to beneficiary ?
+			//       delete from storage
+			Ok(())
+		}
+	}
+
+	impl<T: Config> Pallet<T> {
+		pub fn do_execute_subscriptions(n: T::BlockNumber) -> Weight {
+			let mut itterations = 0;
+
+			let subs = unwrap_or_return!(Subscriptions::<T>::get(n), 0);
+			for (mut sub, account) in subs {
+				if let Some(val) = sub.remaining_payments {
+					if val == 0 {
+						continue
+					}
+				}
+				itterations += 1;
+				if T::Currency::transfer(
+					&account,
+					&sub.beneficiary,
+					sub.amount,
+					ExistenceRequirement::AllowDeath,
+				)
+				.is_err()
+				{
+					continue
+				}
+				sub.remaining_payments = sub.remaining_payments.map(|amount| amount - 1);
+				let new_block = n + sub.frequency;
+                let new_subs = Subscriptions::<T>::take(new_block).map(|mut subs| {
+                    subs.push((sub.clone(), account.clone()));
+                    subs
+                }).unwrap_or_else(|| vec!((sub, account)));
+                Subscriptions::<T>::insert(new_block, new_subs);
+			}
+			T::WeightInfo::do_execute_subscriptions(itterations)
+		}
+	}
+}
