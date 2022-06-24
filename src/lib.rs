@@ -63,19 +63,18 @@ pub mod pallet {
 	#[pallet::getter(fn subscription_nonce)]
 	pub type SubscriptionNonce<T: Config> = StorageValue<_, SubscriptionId, ValueQuery>;
 
-	// the vector should ALWAYS be sorted from biggest to smallest block_number
 	#[pallet::storage]
 	#[pallet::unbounded]
 	#[pallet::getter(fn subscriptions)]
-	pub type Subscriptions<T: Config> = StorageValue<
+	pub type Subscriptions<T: Config> = StorageMap<
 		_,
+		Blake2_256,
+		T::BlockNumber,
 		Vec<(
-			T::BlockNumber,
-			(
-				Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
-				T::AccountId,
-			),
+			Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
+			T::AccountId,
 		)>,
+		OptionQuery,
 	>;
 
 	#[pallet::event]
@@ -166,43 +165,31 @@ pub mod pallet {
 		pub fn do_execute_subscriptions(n: T::BlockNumber) -> Weight {
 			let mut itterations = 0;
 
-			let mut subs = unwrap_or_return!(Subscriptions::<T>::get(), 0);
-			let tmp = subs.clone();
-			let (exec_block, (_, _)) = unwrap_or_return!(tmp.last(), 0);
-			if n > *exec_block {
-				return 0
-			}
-			loop {
-				if let Some((block, (mut sub, account))) = subs.pop() {
-					if block <= *exec_block {
-						if let Some(val) = sub.remaining_payments {
-							if val == 0 {
-								continue
-							}
-						}
-						itterations += 1;
-						if T::Currency::transfer(
-							&account,
-							&sub.beneficiary,
-							sub.amount,
-							ExistenceRequirement::AllowDeath,
-						)
-						.is_err()
-						{
-							continue
-						}
-						sub.remaining_payments = sub.remaining_payments.map(|amount| amount - 1);
-						let new_block = n + sub.frequency - (*exec_block - n);
-						let new_index = subs
-							.binary_search_by(|(block, _)| block.cmp(&new_block))
-							.unwrap_or_else(|e| e);
-						subs.insert(new_index, (new_block, (sub.clone(), account.clone())));
+			let subs = unwrap_or_return!(Subscriptions::<T>::get(n), 0);
+			for (mut sub, account) in subs {
+				if let Some(val) = sub.remaining_payments {
+					if val == 0 {
+						continue
 					}
 				}
-				if (unwrap_or_return!(subs.last(), 0)).0 == *exec_block {
-					Subscriptions::<T>::set(Some(subs));
-					break
+				itterations += 1;
+				if T::Currency::transfer(
+					&account,
+					&sub.beneficiary,
+					sub.amount,
+					ExistenceRequirement::AllowDeath,
+				)
+				.is_err()
+				{
+					continue
 				}
+				sub.remaining_payments = sub.remaining_payments.map(|amount| amount - 1);
+				let new_block = n + sub.frequency;
+                let new_subs = Subscriptions::<T>::take(new_block).map(|mut subs| {
+                    subs.push((sub.clone(), account.clone()));
+                    subs
+                }).unwrap_or_else(|| vec!((sub, account)));
+                Subscriptions::<T>::insert(new_block, new_subs);
 			}
 			T::WeightInfo::do_execute_subscriptions(itterations)
 		}
