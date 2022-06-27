@@ -1,4 +1,4 @@
-use crate::{self as pallet_template, Config };
+use crate::{self as pallet_subscription, Config };
 use frame_support::{assert_noop, assert_ok, construct_runtime, parameter_types,
                     traits::Everything, traits::Currency};
 use sp_core::H256;
@@ -18,7 +18,7 @@ construct_runtime!(
 		UncheckedExtrinsic = UncheckedExtrinsic,
 	{
 		System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
-		PalletTemplate: pallet_template::{Pallet, Call, Storage, Event<T>},
+		PalletSubscription: pallet_subscription::{Pallet, Call, Storage, Event<T>},
 	}
 );
 
@@ -77,12 +77,19 @@ impl ExternalityBuilder {
 #[test]
 fn subscribe(){
     ExternalityBuilder::build().execute_with(|| {
-        assert_ok!(PalletTemplate::subscribe(Origin::signed(1),2,4000,5));
 
-        assert_noop!(PalletTemplate::subscribe(Origin::signed(1),2,0,5), "frequency or amount is 0");
 
-        let expected_event = Event::PalletTemplate(pallet_template::Event::SubscriptionStored (5, 4000));
+        assert_ok!(PalletSubscription::subscribe(Origin::signed(1),2,4000,5));
+
+       assert_noop!(PalletSubscription::subscribe(Origin::signed(1),2,0,5), pallet_subscription::Error::<TestRuntime>::InvalidSubscription);
+
+        assert_noop!(PalletSubscription::subscribe(Origin::signed(1),2,4000,0), pallet_subscription::Error::<TestRuntime>::InvalidSubscription);
+
+        assert_noop!(PalletSubscription::subscribe(Origin::signed(1),2,0,0),  pallet_subscription::Error::<TestRuntime>::InvalidSubscription);
+
+        let expected_event = Event::PalletSubscription(pallet_subscription::Event::SubscriptionCreated (2, 4000, 5));
 
         assert_eq!(System::events()[0].event, expected_event);
+
     })
 }

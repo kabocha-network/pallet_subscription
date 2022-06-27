@@ -4,20 +4,18 @@ pub use pallet::*;
 
 pub mod types;
 
+pub use types::*;
+
 #[cfg(test)]
 mod tests;
 
-
-pub use types::*;
-
-
 pub use frame_support::{
+	ReversibleStorageHasher,
 	storage::IterableStorageMap,
 	traits::tokens::{
 		currency::{Currency, ReservableCurrency},
 		ExistenceRequirement,
 	},
-	ReversibleStorageHasher,
 };
 
 
@@ -76,16 +74,16 @@ pub mod pallet {
 	pub type Subscriptions<T: Config> =
 	StorageMap<_, Blake2_256, T::BlockNumber, Vec<(Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>, T::AccountId)>, OptionQuery>;
 
+
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		SomethingStored(u32, T::AccountId),
-		SubscriptionStored(T::BlockNumber, BalanceOf<T>),
+		SubscriptionCreated(T::AccountId, BalanceOf<T>, T::BlockNumber),
 	}
 
 	#[pallet::error]
 	pub enum Error<T> {
-		NoneValue,
+		InvalidSubscription
 	}
 
 	#[pallet::hooks]
@@ -107,23 +105,23 @@ pub mod pallet {
 		pub fn subscribe(origin: OriginFor<T>, to: T::AccountId,
 					 amount: BalanceOf<T>, frequency: T::BlockNumber) -> DispatchResult {
 
-			ensure_signed(origin)?;
+			ensure_signed(origin.clone())?;
 
 			// check if subscription is valid
-			ensure!(!frequency.is_zero() && !amount.is_zero(), "frequency or amount is 0");
+			ensure!(!frequency.is_zero() && !amount.is_zero(), Error::<T>::InvalidSubscription);
 
 			let sub = Subscription {
-				frequency,
-				amount,
+				frequency: frequency.clone(),
+				amount: amount.clone(),
 				remaining_payments: None,
 				beneficiary: to.clone(),
 			};
 
-			let mut vec: Vec<(Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>, T::AccountId)> = Vec::new();
-			vec.push((sub, to));
+			let mut subscriptions_vec: Vec<(Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>, T::AccountId)> = Vec::new();
+			vec![(sub, origin.clone())];
 
-			<Subscriptions<T>>::insert(frequency, vec);
-			Self::deposit_event(Event::SubscriptionStored(frequency, amount));
+			<Subscriptions<T>>::insert(frequency.clone(), subscriptions_vec.clone());
+			Self::deposit_event(Event::SubscriptionCreated(to, amount, frequency));
 			Ok(())
 		}
 
