@@ -5,6 +5,7 @@ pub use pallet::*;
 pub mod types;
 
 pub use types::*;
+use codec::EncodeLike;
 
 #[cfg(test)]
 mod tests;
@@ -71,18 +72,21 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::unbounded]
 	#[pallet::getter(fn subscriptions)]
-	pub type Subscriptions<T: Config> =
-	StorageMap<_, Blake2_256, T::BlockNumber, Vec<(Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>, T::AccountId)>, OptionQuery>;
+	pub type Subscriptions<T: Config> =                                                       //Nathan: Should be OriginFor<T>
+	StorageMap<_, Blake2_256, u32, Vec<(Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>, T::AccountId)>, OptionQuery>;
 
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
+		/// Subscription has been created
+		//                   //Nathan: Should be OriginFor<T> the second param
 		SubscriptionCreated(T::AccountId, BalanceOf<T>, T::BlockNumber),
 	}
 
 	#[pallet::error]
 	pub enum Error<T> {
+		/// Invalid subscription
 		InvalidSubscription
 	}
 
@@ -113,14 +117,23 @@ pub mod pallet {
 			let sub = Subscription {
 				frequency: frequency.clone(),
 				amount: amount.clone(),
-				remaining_payments: None,
+				remaining_payments: Some(15),
 				beneficiary: to.clone(),
 			};
 
-			let mut subscriptions_vec: Vec<(Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>, T::AccountId)> = Vec::new();
-			vec![(sub, origin.clone())];
+			let subscriptions: Vec<(Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>, T::AccountId)>
+				= vec![(sub, to.clone())];
 
-			<Subscriptions<T>>::insert(frequency.clone(), subscriptions_vec.clone());
+			let key = TryInto::<u32>::try_into(<frame_system::Pallet<T>>::block_number()).ok();
+			let key_to_u32 =  match key {
+				Some(key) => key + 1,
+				_ => 0,
+			};
+
+			<Subscriptions<T>>::mutate(key_to_u32,|val| {
+				*val = Option::from(subscriptions);
+			});
+
 			Self::deposit_event(Event::SubscriptionCreated(to, amount, frequency));
 			Ok(())
 		}
