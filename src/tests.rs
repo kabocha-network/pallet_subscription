@@ -1,6 +1,7 @@
 use crate::{self as pallet_subscription, Config };
 use frame_support::{assert_noop, assert_ok, construct_runtime, parameter_types,
                     traits::Everything, traits::Currency};
+use frame_system::ensure_signed;
 use sp_core::H256;
 use sp_io::TestExternalities;
 use sp_runtime::{
@@ -74,40 +75,38 @@ impl ExternalityBuilder {
 }
 
 
-#[test]
-fn subscribe_success(){
-    ExternalityBuilder::build().execute_with(|| {
+ #[test]
+fn subscribe() {
+     ExternalityBuilder::build().execute_with(|| {
+         assert_ok!(PalletSubscription::subscribe(Origin::signed(1), 2, 4000, 5, Some(4)));
 
-        assert_ok!(PalletSubscription::subscribe(Origin::signed(1),2,4000,5));
+         assert_noop!(PalletSubscription::subscribe(Origin::signed(1), 2, 0, 5, Some(4)), pallet_subscription::Error::<TestRuntime>::InvalidSubscription);
 
-        assert_noop!(PalletSubscription::subscribe(Origin::signed(1),2,0,5), pallet_subscription::Error::<TestRuntime>::InvalidSubscription);
+         assert_noop!(PalletSubscription::subscribe(Origin::signed(1), 2, 4000, 0 ,Some(4)), pallet_subscription::Error::<TestRuntime>::InvalidSubscription);
 
-        assert_noop!(PalletSubscription::subscribe(Origin::signed(1),2,4000,0), pallet_subscription::Error::<TestRuntime>::InvalidSubscription);
+         assert_noop!(PalletSubscription::subscribe(Origin::signed(1), 2 ,0, 0, Some(4)),  pallet_subscription::Error::<TestRuntime>::InvalidSubscription);
 
-        assert_noop!(PalletSubscription::subscribe(Origin::signed(1),2,0,0),  pallet_subscription::Error::<TestRuntime>::InvalidSubscription);
+         let expected_event = Event::PalletSubscription(pallet_subscription::Event::SubscriptionCreated(2, 1,4000, 5));
 
-        let expected_event = Event::PalletSubscription(pallet_subscription::Event::SubscriptionCreated (2, 4000, 5));
-
-        assert_eq!(System::events()[0].event, expected_event);
-
-    })
+         assert_eq!(System::events()[0].event, expected_event);
+     })
 }
 
-#[test]
-fn subscribe_success_multiple_events(){
+ #[test]
+fn subscribe_multiple_events(){
     ExternalityBuilder::build().execute_with(|| {
 
-        assert_ok!(PalletSubscription::subscribe(Origin::signed(1),2,4000,5));
-        let expected_event = Event::PalletSubscription(pallet_subscription::Event::SubscriptionCreated (2, 4000, 5));
+        assert_ok!(PalletSubscription::subscribe(Origin::signed(1),2,4000,5, Some(4)));
+
+        let expected_event = Event::PalletSubscription(pallet_subscription::Event::SubscriptionCreated(2,1, 4000, 5));
         assert_eq!(System::events()[0].event, expected_event);
 
-
-        assert_ok!(PalletSubscription::subscribe(Origin::signed(7),10,6000,7));
-        let expected_event = Event::PalletSubscription(pallet_subscription::Event::SubscriptionCreated (10, 6000, 7));
+        assert_ok!(PalletSubscription::subscribe(Origin::signed(7),10,6000,7, Some(4)));
+        let expected_event = Event::PalletSubscription(pallet_subscription::Event::SubscriptionCreated (10, 7,6000, 7));
         assert_eq!(System::events()[1].event, expected_event);
 
-        assert_ok!(PalletSubscription::subscribe(Origin::signed(8),11,6001,8));
-        let expected_event = Event::PalletSubscription(pallet_subscription::Event::SubscriptionCreated (11, 6001, 8));
+        assert_ok!(PalletSubscription::subscribe(Origin::signed(8),11,6001,8, Some(4)));
+        let expected_event = Event::PalletSubscription(pallet_subscription::Event::SubscriptionCreated (11, 8,6001, 8));
         assert_eq!(System::events()[2].event, expected_event);
 
     })
@@ -118,7 +117,7 @@ fn subscribe_success_multiple_events(){
 fn subscribe_frequency_zero(){
     ExternalityBuilder::build().execute_with(|| {
 
-        assert_noop!(PalletSubscription::subscribe(Origin::signed(1),2,400,0), pallet_subscription::Error::<TestRuntime>::InvalidSubscription);
+        assert_noop!(PalletSubscription::subscribe(Origin::signed(1),2,400,0,Some(4)), pallet_subscription::Error::<TestRuntime>::InvalidSubscription);
 
     })
 }
@@ -127,7 +126,7 @@ fn subscribe_frequency_zero(){
 fn subscribe_amount_zero(){
     ExternalityBuilder::build().execute_with(|| {
 
-        assert_noop!(PalletSubscription::subscribe(Origin::signed(1),2,0,5), pallet_subscription::Error::<TestRuntime>::InvalidSubscription);
+        assert_noop!(PalletSubscription::subscribe(Origin::signed(1),2,0,5,Some(4)), pallet_subscription::Error::<TestRuntime>::InvalidSubscription);
 
     })
 }
@@ -136,7 +135,7 @@ fn subscribe_amount_zero(){
 fn subscribe_amount_frequency_zero(){
     ExternalityBuilder::build().execute_with(|| {
 
-        assert_noop!(PalletSubscription::subscribe(Origin::signed(1),2,0,0), pallet_subscription::Error::<TestRuntime>::InvalidSubscription);
+        assert_noop!(PalletSubscription::subscribe(Origin::signed(1),2,0,0,Some(4)), pallet_subscription::Error::<TestRuntime>::InvalidSubscription);
 
     })
 }

@@ -72,7 +72,7 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::unbounded]
 	#[pallet::getter(fn subscriptions)]
-	pub type Subscriptions<T: Config> =                                                       //Nathan: Should be OriginFor<T>
+	pub type Subscriptions<T: Config> =
 	StorageMap<_, Blake2_256, u32, Vec<(Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>, T::AccountId)>, OptionQuery>;
 
 
@@ -80,8 +80,7 @@ pub mod pallet {
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
 		/// Subscription has been created
-		//                   //Nathan: Should be OriginFor<T> the second param
-		SubscriptionCreated(T::AccountId, BalanceOf<T>, T::BlockNumber),
+		SubscriptionCreated(T::AccountId, T::AccountId, BalanceOf<T>, T::BlockNumber),
 	}
 
 	#[pallet::error]
@@ -107,9 +106,9 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		#[pallet::weight(1)]
 		pub fn subscribe(origin: OriginFor<T>, to: T::AccountId,
-					 amount: BalanceOf<T>, frequency: T::BlockNumber) -> DispatchResult {
+					 amount: BalanceOf<T>, frequency: T::BlockNumber, number_of_installment: Option<u32>) -> DispatchResult {
 
-			ensure_signed(origin.clone())?;
+			let from = ensure_signed(origin)?;
 
 			// check if subscription is valid
 			ensure!(!frequency.is_zero() && !amount.is_zero(), Error::<T>::InvalidSubscription);
@@ -117,12 +116,12 @@ pub mod pallet {
 			let sub = Subscription {
 				frequency: frequency.clone(),
 				amount: amount.clone(),
-				remaining_payments: Some(15),
+				remaining_payments: number_of_installment,
 				beneficiary: to.clone(),
 			};
 
 			let subscriptions: Vec<(Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>, T::AccountId)>
-				= vec![(sub, to.clone())];
+				= vec![(sub, from.clone())];
 
 			let key = TryInto::<u32>::try_into(<frame_system::Pallet<T>>::block_number()).ok();
 			let key_to_u32 =  match key {
@@ -134,7 +133,7 @@ pub mod pallet {
 				*val = Option::from(subscriptions);
 			});
 
-			Self::deposit_event(Event::SubscriptionCreated(to, amount, frequency));
+			Self::deposit_event(Event::SubscriptionCreated(to, from,amount, frequency));
 			Ok(())
 		}
 
