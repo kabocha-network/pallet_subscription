@@ -8,7 +8,8 @@ pub use types::*;
 use codec::EncodeLike;
 
 #[cfg(test)]
-mod tests;
+mod subscribe_call;
+mod mock;
 
 pub use frame_support::{
 	ReversibleStorageHasher,
