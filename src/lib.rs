@@ -20,6 +20,8 @@ pub use frame_support::{
 	ReversibleStorageHasher,
 };
 
+use sp_runtime::traits::Saturating;
+
 // #[cfg(test)]
 // mod mock;
 //
@@ -74,7 +76,7 @@ pub mod pallet {
 	pub type Subscriptions<T: Config> = StorageMap<
 		_,
 		Blake2_256,
-		u32,
+		T::BlockNumber,
 		Vec<(
 			Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
 			T::AccountId,
@@ -126,26 +128,24 @@ pub mod pallet {
 				Error::<T>::InvalidSubscription
 			);
 
-			let sub = Subscription {
+			let subscription = Subscription {
 				frequency,
 				amount,
 				remaining_payments: number_of_installment,
 				beneficiary: to.clone(),
 			};
 
-			let subscriptions: Vec<(
-				Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
-				T::AccountId,
-			)> = vec![(sub, from.clone())];
+			let new_subscription = (subscription, from.clone());
 
-			let key = TryInto::<u32>::try_into(<frame_system::Pallet<T>>::block_number()).ok();
-			let key_to_u32 = match key {
-				Some(key) => key + 1,
-				_ => 0,
-			};
+			let mut next_block_number = <frame_system::Pallet<T>>::block_number();
+			next_block_number.saturating_inc();
 
-			<Subscriptions<T>>::mutate(key_to_u32, |val| {
-				*val = Option::from(subscriptions);
+			<Subscriptions<T>>::mutate(next_block_number, |wrapped_current_subscriptions| {
+				if let Some(current_subscription) = wrapped_current_subscriptions {
+					current_subscription.push(new_subscription);
+				} else {
+					*wrapped_current_subscriptions = Option::from(vec![new_subscription]);
+				}
 			});
 
 			Self::deposit_event(Event::SubscriptionCreated(to, from, amount, frequency));
