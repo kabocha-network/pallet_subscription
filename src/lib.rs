@@ -7,9 +7,8 @@ pub mod types;
 
 pub use types::*;
 
-mod mock;
 #[cfg(test)]
-mod subscribe_call;
+mod tests;
 
 pub use frame_support::{
 	storage::IterableStorageMap,
@@ -21,15 +20,6 @@ pub use frame_support::{
 };
 
 use sp_runtime::traits::Saturating;
-
-// #[cfg(test)]
-// mod mock;
-//
-// #[cfg(test)]
-// mod tests;
-//
-// #[cfg(feature = "runtime-benchmarks")]
-// mod benchmarking;
 
 #[frame_support::pallet]
 pub mod pallet {
