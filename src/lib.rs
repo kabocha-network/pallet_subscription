@@ -1,5 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![allow(clippy::type_complexity)]
+#![feature(is_some_with)]
 
 pub use pallet::*;
 
@@ -124,7 +125,9 @@ pub mod pallet {
 
 			// check if subscription is valid
 			ensure!(
-				!frequency.is_zero() && !amount.is_zero(),
+				!frequency.is_zero()
+					&& !amount.is_zero() && number_of_installment.is_some_and(|&x| x > 1)
+					&& to != from,
 				Error::<T>::InvalidSubscription
 			);
 
