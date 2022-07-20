@@ -123,10 +123,9 @@ pub mod pallet {
 		) -> DispatchResult {
 			let from = ensure_signed(origin)?;
 
-			// check if subscription is valid
 			ensure!(
 				!frequency.is_zero()
-					&& !amount.is_zero() && number_of_installment.is_some_and(|&x| x > 1)
+					&& !amount.is_zero() && number_of_installment.is_some_and(|&x| x >= 1)
 					&& to != from,
 				Error::<T>::InvalidSubscription
 			);

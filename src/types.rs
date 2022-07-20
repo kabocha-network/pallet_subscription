@@ -17,13 +17,3 @@ pub struct Subscription<BlockNumber, Balance, AccountId> {
 	pub remaining_payments: Option<u32>,
 	pub beneficiary: AccountId,
 }
-
-#[macro_export]
-macro_rules! unwrap_or_return {
-	( $e:expr, $f:expr ) => {
-		match $e {
-			Some(x) => x,
-			None => return $f,
-		}
-	};
-}
