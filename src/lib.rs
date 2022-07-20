@@ -1,25 +1,24 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+#![allow(clippy::type_complexity)]
 
 pub use pallet::*;
 
 pub mod types;
 
 pub use types::*;
-use codec::EncodeLike;
 
+mod mock;
 #[cfg(test)]
 mod subscribe_call;
-mod mock;
 
 pub use frame_support::{
-	ReversibleStorageHasher,
 	storage::IterableStorageMap,
 	traits::tokens::{
 		currency::{Currency, ReservableCurrency},
 		ExistenceRequirement,
 	},
+	ReversibleStorageHasher,
 };
-
 
 // #[cfg(test)]
 // mod mock;
@@ -33,9 +32,8 @@ pub use frame_support::{
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	use frame_support::pallet_prelude::*;
+	use frame_support::{pallet_prelude::*, sp_runtime::traits::Zero};
 	use frame_system::pallet_prelude::*;
-	use frame_support::sp_runtime::traits::Zero;
 
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
@@ -73,9 +71,16 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::unbounded]
 	#[pallet::getter(fn subscriptions)]
-	pub type Subscriptions<T: Config> =
-	StorageMap<_, Blake2_256, u32, Vec<(Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>, T::AccountId)>, OptionQuery>;
-
+	pub type Subscriptions<T: Config> = StorageMap<
+		_,
+		Blake2_256,
+		u32,
+		Vec<(
+			Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
+			T::AccountId,
+		)>,
+		OptionQuery,
+	>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -87,12 +92,12 @@ pub mod pallet {
 	#[pallet::error]
 	pub enum Error<T> {
 		/// Invalid subscription
-		InvalidSubscription
+		InvalidSubscription,
 	}
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-		fn on_initialize(n: T::BlockNumber) -> Weight {
+		fn on_initialize(_n: T::BlockNumber) -> Weight {
 			//// prop 1:
 			// - loop over all subscriptions (.iter_values())
 			// - check if the subscription shoud be taken
@@ -106,37 +111,45 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		#[pallet::weight(1)]
-		pub fn subscribe(origin: OriginFor<T>, to: T::AccountId,
-					 amount: BalanceOf<T>, frequency: T::BlockNumber, number_of_installment: Option<u32>) -> DispatchResult {
-
+		pub fn subscribe(
+			origin: OriginFor<T>,
+			to: T::AccountId,
+			amount: BalanceOf<T>,
+			frequency: T::BlockNumber,
+			number_of_installment: Option<u32>,
+		) -> DispatchResult {
 			let from = ensure_signed(origin)?;
 
 			// check if subscription is valid
-			ensure!(!frequency.is_zero() && !amount.is_zero(), Error::<T>::InvalidSubscription);
+			ensure!(
+				!frequency.is_zero() && !amount.is_zero(),
+				Error::<T>::InvalidSubscription
+			);
 
 			let sub = Subscription {
-				frequency: frequency.clone(),
-				amount: amount.clone(),
+				frequency,
+				amount,
 				remaining_payments: number_of_installment,
 				beneficiary: to.clone(),
 			};
 
-			let subscriptions: Vec<(Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>, T::AccountId)>
-				= vec![(sub, from.clone())];
+			let subscriptions: Vec<(
+				Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
+				T::AccountId,
+			)> = vec![(sub, from.clone())];
 
 			let key = TryInto::<u32>::try_into(<frame_system::Pallet<T>>::block_number()).ok();
-			let key_to_u32 =  match key {
+			let key_to_u32 = match key {
 				Some(key) => key + 1,
 				_ => 0,
 			};
 
-			<Subscriptions<T>>::mutate(key_to_u32,|val| {
+			<Subscriptions<T>>::mutate(key_to_u32, |val| {
 				*val = Option::from(subscriptions);
 			});
 
-			Self::deposit_event(Event::SubscriptionCreated(to, from,amount, frequency));
+			Self::deposit_event(Event::SubscriptionCreated(to, from, amount, frequency));
 			Ok(())
 		}
-
 	}
 }

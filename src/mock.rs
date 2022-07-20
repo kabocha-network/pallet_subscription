@@ -1,14 +1,10 @@
-
 use crate::{self as pallet_subscription, Config};
-use frame_system as system;
-use frame_support::{assert_noop, assert_ok, construct_runtime, parameter_types,
-                    traits::Everything, traits::Currency};
-use frame_system::ensure_signed;
+use frame_support::{construct_runtime, parameter_types, traits::Everything};
 use sp_core::H256;
 use sp_io::TestExternalities;
 use sp_runtime::{
-    testing::Header,
-    traits::{BlakeTwo256, IdentityLookup},
+	testing::Header,
+	traits::{BlakeTwo256, IdentityLookup},
 };
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<TestRuntime>;
@@ -31,47 +27,46 @@ parameter_types! {
 		frame_system::limits::BlockWeights::simple_max(1024);
 }
 impl frame_system::Config for TestRuntime {
-    type BaseCallFilter = Everything;
-    type BlockWeights = ();
-    type BlockLength = ();
-    type Origin = Origin;
-    type Call = Call;
-    type Index = u64;
-    type BlockNumber = u64;
-    type Hash = H256;
-    type Hashing = BlakeTwo256;
-    type AccountId = u64;
-    type Lookup = IdentityLookup<Self::AccountId>;
-    type Header = Header;
-    type Event = Event;
-    type BlockHashCount = BlockHashCount;
-    type DbWeight = ();
-    type Version = ();
-    type PalletInfo = PalletInfo;
-    type AccountData = ();
-    type OnNewAccount = ();
-    type OnKilledAccount = ();
-    type SystemWeightInfo = ();
-    type SS58Prefix = ();
-    type OnSetCode = ();
-    type MaxConsumers = frame_support::traits::ConstU32<16>;
+	type AccountData = ();
+	type AccountId = u64;
+	type BaseCallFilter = Everything;
+	type BlockHashCount = BlockHashCount;
+	type BlockLength = ();
+	type BlockNumber = u64;
+	type BlockWeights = ();
+	type Call = Call;
+	type DbWeight = ();
+	type Event = Event;
+	type Hash = H256;
+	type Hashing = BlakeTwo256;
+	type Header = Header;
+	type Index = u64;
+	type Lookup = IdentityLookup<Self::AccountId>;
+	type MaxConsumers = frame_support::traits::ConstU32<16>;
+	type OnKilledAccount = ();
+	type OnNewAccount = ();
+	type OnSetCode = ();
+	type Origin = Origin;
+	type PalletInfo = PalletInfo;
+	type SS58Prefix = ();
+	type SystemWeightInfo = ();
+	type Version = ();
 }
 
 impl Config for TestRuntime {
-    type Event = Event;
-    type Currency = ();
-    type MaxMetadataLength = ();
+	type Currency = ();
+	type Event = Event;
+	type MaxMetadataLength = ();
 }
 
 pub struct ExternalityBuilder;
 
 impl ExternalityBuilder {
-    pub fn build() -> TestExternalities {
-        let storage = frame_system::GenesisConfig::default()
-            .build_storage::<TestRuntime>()
-            .unwrap();
-        let mut ext = TestExternalities::from(storage);
-        ext.execute_with(|| System::set_block_number(1));
-        ext
-    }
+	pub fn build() -> TestExternalities {
+		let storage =
+			frame_system::GenesisConfig::default().build_storage::<TestRuntime>().unwrap();
+		let mut ext = TestExternalities::from(storage);
+		ext.execute_with(|| System::set_block_number(1));
+		ext
+	}
 }

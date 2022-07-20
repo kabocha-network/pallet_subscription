@@ -18,8 +18,6 @@ pub struct Subscription<BlockNumber, Balance, AccountId> {
 	pub beneficiary: AccountId,
 }
 
-
-
 #[macro_export]
 macro_rules! unwrap_or_return {
 	( $e:expr, $f:expr ) => {
