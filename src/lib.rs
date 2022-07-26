@@ -79,12 +79,13 @@ pub mod pallet {
 	pub enum Event<T: Config> {
 		/// Subscription has been created
 		SubscriptionCreated(T::AccountId, T::AccountId, BalanceOf<T>, T::BlockNumber),
+		UnsubscriptionCreated(T::AccountId, T::AccountId),
 	}
 
 	#[pallet::error]
 	pub enum Error<T> {
-		/// Invalid subscription
 		InvalidSubscription,
+		UnknownUnsubscription,
 	}
 
 	#[pallet::hooks]
@@ -134,14 +135,49 @@ pub mod pallet {
 			next_block_number.saturating_inc();
 
 			<Subscriptions<T>>::mutate(next_block_number, |wrapped_current_subscriptions| {
-				if let Some(current_subscription) = wrapped_current_subscriptions {
-					current_subscription.push(new_subscription);
+				if let Some(current_subscriptions) = wrapped_current_subscriptions {
+					current_subscriptions.push(new_subscription);
 				} else {
 					*wrapped_current_subscriptions = Option::from(vec![new_subscription]);
 				}
 			});
 
 			Self::deposit_event(Event::SubscriptionCreated(to, from, amount, frequency));
+			Ok(())
+		}
+
+		#[pallet::weight(1)]
+		pub fn unsubscribe(
+			origin: OriginFor<T>,
+			subscriber: T::AccountId,
+			subscription: Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
+			when: T::BlockNumber,
+		) -> DispatchResult {
+			ensure_signed(origin)?;
+
+			<Subscriptions<T>>::mutate(when, |wrapped_current_subscriptions| {
+				if let Some(current_subscriptions) = wrapped_current_subscriptions {
+					let old_subscriptions_len = current_subscriptions.len();
+
+					current_subscriptions.retain(|current_subscription| {
+						!(current_subscription.0 == subscription
+							&& current_subscription.1 == subscriber)
+					});
+
+					if old_subscriptions_len >= current_subscriptions.len() {
+						Err(Error::<T>::UnknownUnsubscription)
+					} else {
+						Ok(())
+					}
+				} else {
+					Err(Error::<T>::UnknownUnsubscription)
+				}
+			})?;
+
+			Self::deposit_event(Event::UnsubscriptionCreated(
+				subscription.beneficiary,
+				subscriber,
+			));
 			Ok(())
 		}
 	}
