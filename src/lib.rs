@@ -79,7 +79,10 @@ pub mod pallet {
 	pub enum Event<T: Config> {
 		/// Subscription has been created
 		Subscription(T::AccountId, T::AccountId, BalanceOf<T>, T::BlockNumber),
-		Unsubscription(Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>, T::AccountId),
+		Unsubscription(
+			Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
+			T::AccountId,
+		),
 	}
 
 	#[pallet::error]
@@ -117,7 +120,7 @@ pub mod pallet {
 				!frequency.is_zero()
 					&& !amount.is_zero() && match number_of_installment {
 					Some(x) => x >= 1,
-					None => false,
+					None => true,
 				} && to != from,
 				Error::<T>::InvalidSubscription
 			);
@@ -174,10 +177,7 @@ pub mod pallet {
 				}
 			})?;
 
-			Self::deposit_event(Event::Unsubscription(
-				subscription,
-				subscriber,
-			));
+			Self::deposit_event(Event::Unsubscription(subscription, subscriber));
 			Ok(())
 		}
 	}
