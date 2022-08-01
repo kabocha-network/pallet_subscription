@@ -78,8 +78,8 @@ pub mod pallet {
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
 		/// Subscription has been created
-		SubscriptionCreated(T::AccountId, T::AccountId, BalanceOf<T>, T::BlockNumber),
-		UnsubscriptionCreated(T::AccountId, T::AccountId),
+		Subscription(T::AccountId, T::AccountId, BalanceOf<T>, T::BlockNumber),
+		Unsubscription(T::AccountId, T::AccountId),
 	}
 
 	#[pallet::error]
@@ -142,7 +142,7 @@ pub mod pallet {
 				}
 			});
 
-			Self::deposit_event(Event::SubscriptionCreated(to, from, amount, frequency));
+			Self::deposit_event(Event::Subscription(to, from, amount, frequency));
 			Ok(())
 		}
 
@@ -174,7 +174,7 @@ pub mod pallet {
 				}
 			})?;
 
-			Self::deposit_event(Event::UnsubscriptionCreated(
+			Self::deposit_event(Event::Unsubscription(
 				subscription.beneficiary,
 				subscriber,
 			));

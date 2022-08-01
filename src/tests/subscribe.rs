@@ -29,7 +29,7 @@ fn subscribe() {
 		);
 
 		let expected_event =
-			Event::PalletSubscription(crate::Event::SubscriptionCreated(2, 1, 4000, 5));
+			Event::PalletSubscription(crate::Event::Subscription(2, 1, 4000, 5));
 
 		assert_eq!(System::events()[0].event, expected_event);
 	})
@@ -47,7 +47,7 @@ fn subscribe_multiple_events() {
 		));
 
 		let expected_event =
-			Event::PalletSubscription(crate::Event::SubscriptionCreated(2, 1, 4000, 5));
+			Event::PalletSubscription(crate::Event::Subscription(2, 1, 4000, 5));
 		assert_eq!(System::events()[0].event, expected_event);
 
 		assert_ok!(PalletSubscription::subscribe(
@@ -58,7 +58,7 @@ fn subscribe_multiple_events() {
 			Some(4)
 		));
 		let expected_event =
-			Event::PalletSubscription(crate::Event::SubscriptionCreated(10, 7, 6000, 7));
+			Event::PalletSubscription(crate::Event::Subscription(10, 7, 6000, 7));
 		assert_eq!(System::events()[1].event, expected_event);
 
 		assert_ok!(PalletSubscription::subscribe(
@@ -69,7 +69,7 @@ fn subscribe_multiple_events() {
 			Some(4)
 		));
 		let expected_event =
-			Event::PalletSubscription(crate::Event::SubscriptionCreated(11, 8, 6001, 8));
+			Event::PalletSubscription(crate::Event::Subscription(11, 8, 6001, 8));
 		assert_eq!(System::events()[2].event, expected_event);
 	})
 }
