@@ -50,7 +50,7 @@ pub mod pallet {
 	#[pallet::getter(fn subscription_plans)]
 	pub type Plans<T: Config> = StorageMap<
 		_,
-		Blake2_256,
+		Twox64Concat,
 		PlanId,
 		Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
 		OptionQuery,
@@ -65,7 +65,7 @@ pub mod pallet {
 	#[pallet::getter(fn subscriptions)]
 	pub type Subscriptions<T: Config> = StorageMap<
 		_,
-		Blake2_256,
+		Twox64Concat,
 		T::BlockNumber,
 		Vec<(
 			Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
