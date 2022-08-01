@@ -134,8 +134,8 @@ pub mod pallet {
 
 			let new_subscription = (subscription, from.clone());
 
-			let mut next_block_number = <frame_system::Pallet<T>>::block_number();
-			next_block_number.saturating_inc();
+			let next_block_number =
+				<frame_system::Pallet<T>>::block_number().saturating_add(1u32.into());
 
 			<Subscriptions<T>>::mutate(next_block_number, |wrapped_current_subscriptions| {
 				if let Some(current_subscriptions) = wrapped_current_subscriptions {
