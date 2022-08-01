@@ -132,6 +132,7 @@ fn subscribe_multiple_events() {
 			frequency,
 			number_of_installment
 		));
+
 		let expected_event =
 			Event::PalletSubscription(crate::Event::Subscription(ASHLEY, MIKE, amount, frequency));
 		let received_event = &System::events()[2].event;
@@ -203,5 +204,30 @@ fn subscribe_amount_frequency_zero() {
 			),
 			Error::<TestRuntime>::InvalidSubscription
 		);
+	})
+}
+
+#[test]
+fn subscribe_number_of_installment_none() {
+	ExternalityBuilder::build().execute_with(|| {
+		const ALICE: u64 = 1;
+		const BOB: u64 = 2;
+		let amount = 2000;
+		let frequency = 4;
+		let number_of_installment = None;
+
+		assert_ok!(PalletSubscription::subscribe(
+			Origin::signed(ALICE),
+			BOB,
+			amount,
+			frequency,
+			number_of_installment
+		));
+
+		let expected_event =
+			Event::PalletSubscription(crate::Event::Subscription(BOB, ALICE, amount, frequency));
+		let received_event = &System::events()[0].event;
+
+		assert_eq!(*received_event, expected_event);
 	})
 }
