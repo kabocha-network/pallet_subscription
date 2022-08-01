@@ -141,7 +141,7 @@ pub mod pallet {
 				if let Some(current_subscriptions) = wrapped_current_subscriptions {
 					current_subscriptions.push(new_subscription);
 				} else {
-					*wrapped_current_subscriptions = Option::from(vec![new_subscription]);
+					*wrapped_current_subscriptions = Some(vec![new_subscription]);
 				}
 			});
 
