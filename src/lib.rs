@@ -79,7 +79,7 @@ pub mod pallet {
 	pub enum Event<T: Config> {
 		/// Subscription has been created
 		Subscription(T::AccountId, T::AccountId, BalanceOf<T>, T::BlockNumber),
-		Unsubscription(T::AccountId, T::AccountId),
+		Unsubscription(Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>, T::AccountId),
 	}
 
 	#[pallet::error]
@@ -175,7 +175,7 @@ pub mod pallet {
 			})?;
 
 			Self::deposit_event(Event::Unsubscription(
-				subscription.beneficiary,
+				subscription,
 				subscriber,
 			));
 			Ok(())
