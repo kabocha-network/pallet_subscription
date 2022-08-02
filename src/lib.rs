@@ -89,6 +89,7 @@ pub mod pallet {
 	pub enum Error<T> {
 		InvalidSubscription,
 		UnknownUnsubscription,
+		InvalidUnsubscription,
 	}
 
 	#[pallet::hooks]
@@ -155,23 +156,28 @@ pub mod pallet {
 			subscriber: T::AccountId,
 			subscription: Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
 			when: T::BlockNumber,
+			index: u32,
 		) -> DispatchResult {
 			ensure_signed(origin)?;
 
 			<Subscriptions<T>>::mutate(when, |wrapped_current_subscriptions| {
 				if let Some(current_subscriptions) = wrapped_current_subscriptions {
-					let old_subscriptions_len = current_subscriptions.len();
+					let index = index as usize;
 
-					current_subscriptions.retain(|current_subscription| {
-						!(current_subscription.0 == subscription
-							&& current_subscription.1 == subscriber)
-					});
-
-					if old_subscriptions_len >= current_subscriptions.len() {
-						Err(Error::<T>::UnknownUnsubscription)
-					} else {
-						Ok(())
+					if index >= current_subscriptions.len() {
+						return Err(Error::<T>::InvalidUnsubscription)
 					}
+
+					let desired_subscription = &(current_subscriptions[index]);
+
+					if !((*desired_subscription).0 == subscription
+						&& (*desired_subscription).1 == subscriber)
+					{
+						return Err(Error::<T>::InvalidUnsubscription)
+					}
+
+					current_subscriptions.remove(index);
+					Ok(())
 				} else {
 					Err(Error::<T>::UnknownUnsubscription)
 				}
