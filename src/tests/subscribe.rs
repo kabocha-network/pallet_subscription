@@ -7,17 +7,30 @@ fn subscribe() {
 	ExternalityBuilder::build().execute_with(|| {
 		const ALICE: u64 = 1;
 		const BOB: u64 = 2;
-		let first_amount = 4000;
-		let first_frequency = 5;
-		let first_number_of_installment = Some(4);
+
+		let origin = Origin::signed(ALICE);
+		let from = ALICE;
+		let to = BOB;
+
+		let amount = 4000;
+		let frequency = 5;
+		let number_of_installment = Some(4);
 
 		assert_ok!(PalletSubscription::subscribe(
-			Origin::signed(ALICE),
-			BOB,
-			first_amount,
-			first_frequency,
-			first_number_of_installment
+			origin.clone(),
+			to,
+			amount,
+			frequency,
+			number_of_installment
 		));
+
+		let expected_event =
+			Event::PalletSubscription(crate::Event::Subscription(to, from, amount, frequency));
+		let received_event = &System::events()[0].event;
+
+		assert_eq!(*received_event, expected_event);
+
+		// Wrong subscribe (amount == 0)
 
 		let amount = 0;
 		let frequency = 5;
@@ -25,14 +38,16 @@ fn subscribe() {
 
 		assert_noop!(
 			PalletSubscription::subscribe(
-				Origin::signed(ALICE),
-				BOB,
+				origin.clone(),
+				to,
 				amount,
 				frequency,
 				number_of_installment
 			),
 			Error::<TestRuntime>::InvalidSubscription
 		);
+
+		// Wrong subscribe (frequency == 0)
 
 		let amount = 4000;
 		let frequency = 0;
@@ -40,101 +55,111 @@ fn subscribe() {
 
 		assert_noop!(
 			PalletSubscription::subscribe(
-				Origin::signed(ALICE),
-				BOB,
+				origin.clone(),
+				to,
 				amount,
 				frequency,
 				number_of_installment
 			),
 			Error::<TestRuntime>::InvalidSubscription
 		);
+
+		// Wrong subscribe (amount == 0 & frequency == 0)
 
 		let amount = 0;
 		let frequency = 0;
 		let number_of_installment = Some(4);
 
 		assert_noop!(
-			PalletSubscription::subscribe(
-				Origin::signed(ALICE),
-				BOB,
-				amount,
-				frequency,
-				number_of_installment
-			),
+			PalletSubscription::subscribe(origin, to, amount, frequency, number_of_installment),
 			Error::<TestRuntime>::InvalidSubscription
 		);
 
-		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
-			BOB,
-			ALICE,
-			first_amount,
-			first_frequency,
-		));
-		let received_event = &System::events()[0].event;
-
-		assert_eq!(*received_event, expected_event);
+		// Checking whether no new events were added.
+		assert_eq!(System::events().len(), 1);
 	})
 }
 
 #[test]
 fn subscribe_multiple_events() {
 	ExternalityBuilder::build().execute_with(|| {
+		// Subscription n1 - ALICE to BOB
+
 		const ALICE: u64 = 1;
 		const BOB: u64 = 2;
+
+		let origin = Origin::signed(ALICE);
+		let from = ALICE;
+		let to = BOB;
+
 		let amount = 4000;
 		let frequency = 5;
 		let number_of_installment = Some(4);
 
 		assert_ok!(PalletSubscription::subscribe(
-			Origin::signed(ALICE),
-			BOB,
+			origin,
+			to,
 			amount,
 			frequency,
 			number_of_installment
 		));
 
 		let expected_event =
-			Event::PalletSubscription(crate::Event::Subscription(BOB, ALICE, amount, frequency));
+			Event::PalletSubscription(crate::Event::Subscription(to, from, amount, frequency));
 		let received_event = &System::events()[0].event;
 
 		assert_eq!(*received_event, expected_event);
 
-		const PAUL: u64 = 7;
-		const JANE: u64 = 10;
+		// Subscription n2 - PAUL to JANE
+
+		const PAUL: u64 = 3;
+		const JANE: u64 = 4;
+
+		let origin = Origin::signed(PAUL);
+		let from = PAUL;
+		let to = JANE;
+
 		let amount = 6000;
 		let frequency = 7;
 		let number_of_installment = Some(4);
 
 		assert_ok!(PalletSubscription::subscribe(
-			Origin::signed(PAUL),
-			JANE,
+			origin,
+			to,
 			amount,
 			frequency,
 			number_of_installment
 		));
 
 		let expected_event =
-			Event::PalletSubscription(crate::Event::Subscription(JANE, PAUL, amount, frequency));
+			Event::PalletSubscription(crate::Event::Subscription(to, from, amount, frequency));
 		let received_event = &System::events()[1].event;
 
 		assert_eq!(*received_event, expected_event);
 
-		const MIKE: u64 = 8;
-		const ASHLEY: u64 = 11;
+		// Subscription n3 - MIKE to ASHLEY
+
+		const MIKE: u64 = 5;
+		const ASHLEY: u64 = 6;
+
+		let origin = Origin::signed(MIKE);
+		let from = MIKE;
+		let to = ASHLEY;
+
 		let amount = 6001;
 		let frequency = 8;
 		let number_of_installment = Some(4);
 
 		assert_ok!(PalletSubscription::subscribe(
-			Origin::signed(MIKE),
-			ASHLEY,
+			origin,
+			to,
 			amount,
 			frequency,
 			number_of_installment
 		));
 
 		let expected_event =
-			Event::PalletSubscription(crate::Event::Subscription(ASHLEY, MIKE, amount, frequency));
+			Event::PalletSubscription(crate::Event::Subscription(to, from, amount, frequency));
 		let received_event = &System::events()[2].event;
 
 		assert_eq!(*received_event, expected_event);
@@ -146,18 +171,16 @@ fn subscribe_frequency_zero() {
 	ExternalityBuilder::build().execute_with(|| {
 		const ALICE: u64 = 1;
 		const BOB: u64 = 2;
+
+		let origin = Origin::signed(ALICE);
+		let to = BOB;
+
 		let amount = 400;
 		let frequency = 0;
 		let number_of_installment = Some(4);
 
 		assert_noop!(
-			PalletSubscription::subscribe(
-				Origin::signed(ALICE),
-				BOB,
-				amount,
-				frequency,
-				number_of_installment
-			),
+			PalletSubscription::subscribe(origin, to, amount, frequency, number_of_installment),
 			Error::<TestRuntime>::InvalidSubscription
 		);
 	})
@@ -168,18 +191,16 @@ fn subscribe_amount_zero() {
 	ExternalityBuilder::build().execute_with(|| {
 		const ALICE: u64 = 1;
 		const BOB: u64 = 2;
+
+		let origin = Origin::signed(ALICE);
+		let to = BOB;
+
 		let amount = 0;
 		let frequency = 5;
 		let number_of_installment = Some(4);
 
 		assert_noop!(
-			PalletSubscription::subscribe(
-				Origin::signed(ALICE),
-				BOB,
-				amount,
-				frequency,
-				number_of_installment
-			),
+			PalletSubscription::subscribe(origin, to, amount, frequency, number_of_installment),
 			Error::<TestRuntime>::InvalidSubscription
 		);
 	})
@@ -190,18 +211,16 @@ fn subscribe_amount_frequency_zero() {
 	ExternalityBuilder::build().execute_with(|| {
 		const ALICE: u64 = 1;
 		const BOB: u64 = 2;
+
+		let origin = Origin::signed(ALICE);
+		let to = BOB;
+
 		let amount = 0;
 		let frequency = 0;
 		let number_of_installment = Some(4);
 
 		assert_noop!(
-			PalletSubscription::subscribe(
-				Origin::signed(ALICE),
-				BOB,
-				amount,
-				frequency,
-				number_of_installment
-			),
+			PalletSubscription::subscribe(origin, to, amount, frequency, number_of_installment),
 			Error::<TestRuntime>::InvalidSubscription
 		);
 	})
@@ -212,20 +231,25 @@ fn subscribe_number_of_installment_none() {
 	ExternalityBuilder::build().execute_with(|| {
 		const ALICE: u64 = 1;
 		const BOB: u64 = 2;
+
+		let origin = Origin::signed(ALICE);
+		let from = ALICE;
+		let to = BOB;
+
 		let amount = 2000;
 		let frequency = 4;
 		let number_of_installment = None;
 
 		assert_ok!(PalletSubscription::subscribe(
-			Origin::signed(ALICE),
-			BOB,
+			origin,
+			to,
 			amount,
 			frequency,
 			number_of_installment
 		));
 
 		let expected_event =
-			Event::PalletSubscription(crate::Event::Subscription(BOB, ALICE, amount, frequency));
+			Event::PalletSubscription(crate::Event::Subscription(to, from, amount, frequency));
 		let received_event = &System::events()[0].event;
 
 		assert_eq!(*received_event, expected_event);

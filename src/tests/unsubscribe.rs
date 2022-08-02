@@ -11,26 +11,23 @@ fn unsubscribe() {
 		const BOB: u64 = 2;
 
 		let origin = Origin::signed(ALICE);
-		let beneficiary = BOB;
-		let subscriber = ALICE;
+		let from = ALICE;
+		let to = BOB;
+
 		let amount = 4000;
 		let frequency = 5;
 		let number_of_installment = Some(4);
 
 		assert_ok!(PalletSubscription::subscribe(
 			origin.clone(),
-			beneficiary,
+			to,
 			amount,
 			frequency,
 			number_of_installment
 		));
 
-		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
-			beneficiary,
-			subscriber,
-			amount,
-			frequency,
-		));
+		let expected_event =
+			Event::PalletSubscription(crate::Event::Subscription(to, from, amount, frequency));
 		let received_event = &System::events()[0].event;
 
 		assert_eq!(*received_event, expected_event);
@@ -43,21 +40,21 @@ fn unsubscribe() {
 			frequency,
 			amount,
 			remaining_payments,
-			beneficiary,
+			beneficiary: to,
 		};
-		let index: u32 = 0;
 		let when = <frame_system::Pallet<TestRuntime>>::block_number().saturating_add(1u32.into());
+		let index: u32 = 0;
 
 		assert_ok!(PalletSubscription::unsubscribe(
 			origin,
-			subscriber,
+			from,
 			subscription.clone(),
 			when,
 			index
 		));
 
 		let expected_event =
-			Event::PalletSubscription(crate::Event::Unsubscription(subscription, subscriber));
+			Event::PalletSubscription(crate::Event::Unsubscription(subscription, from));
 		let received_event = &System::events()[1].event;
 
 		assert_eq!(*received_event, expected_event);
@@ -70,23 +67,25 @@ fn unsubscribe_no_subscriptions_found() {
 		const ALICE: u64 = 1;
 		const BOB: u64 = 2;
 
+		let origin = Origin::signed(ALICE);
+		let from = ALICE;
+		let to = BOB;
+
 		let frequency = 5;
 		let amount = 4000;
 		let remaining_payments = Some(4);
 
-		let origin = Origin::signed(ALICE);
-		let subscriber = ALICE;
 		let subscription = Subscription {
 			frequency,
 			amount,
 			remaining_payments,
-			beneficiary: BOB,
+			beneficiary: to,
 		};
 		let when = 1000;
 		let index: u32 = 0;
 
 		assert_noop!(
-			PalletSubscription::unsubscribe(origin, subscriber, subscription, when, index),
+			PalletSubscription::unsubscribe(origin, from, subscription, when, index),
 			Error::<TestRuntime>::UnknownUnsubscription
 		);
 	})
@@ -101,26 +100,23 @@ fn unsubscribe_invalid_when() {
 		const BOB: u64 = 2;
 
 		let origin = Origin::signed(ALICE);
-		let beneficiary = BOB;
-		let subscriber = ALICE;
+		let from = ALICE;
+		let to = BOB;
+
 		let amount = 4000;
 		let frequency = 5;
 		let number_of_installment = Some(4);
 
 		assert_ok!(PalletSubscription::subscribe(
 			origin.clone(),
-			beneficiary,
+			to,
 			amount,
 			frequency,
 			number_of_installment
 		));
 
-		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
-			beneficiary,
-			subscriber,
-			amount,
-			frequency,
-		));
+		let expected_event =
+			Event::PalletSubscription(crate::Event::Subscription(to, from, amount, frequency));
 		let received_event = &System::events()[0].event;
 
 		assert_eq!(*received_event, expected_event);
@@ -133,13 +129,13 @@ fn unsubscribe_invalid_when() {
 			frequency,
 			amount,
 			remaining_payments,
-			beneficiary,
+			beneficiary: to,
 		};
-		let index: u32 = 0;
 		let when = 1000;
+		let index: u32 = 0;
 
 		assert_noop!(
-			PalletSubscription::unsubscribe(origin, subscriber, subscription, when, index),
+			PalletSubscription::unsubscribe(origin, from, subscription, when, index),
 			Error::<TestRuntime>::UnknownUnsubscription
 		);
 	})
@@ -154,26 +150,23 @@ fn unsubscribe_index_out_of_bounds() {
 		const BOB: u64 = 2;
 
 		let origin = Origin::signed(ALICE);
-		let beneficiary = BOB;
-		let subscriber = ALICE;
+		let from = ALICE;
+		let to = BOB;
+
 		let amount = 4000;
 		let frequency = 5;
 		let number_of_installment = Some(4);
 
 		assert_ok!(PalletSubscription::subscribe(
 			origin.clone(),
-			beneficiary,
+			to,
 			amount,
 			frequency,
 			number_of_installment
 		));
 
-		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
-			beneficiary,
-			subscriber,
-			amount,
-			frequency,
-		));
+		let expected_event =
+			Event::PalletSubscription(crate::Event::Subscription(to, from, amount, frequency));
 		let received_event = &System::events()[0].event;
 
 		assert_eq!(*received_event, expected_event);
@@ -186,13 +179,13 @@ fn unsubscribe_index_out_of_bounds() {
 			frequency,
 			amount,
 			remaining_payments,
-			beneficiary,
+			beneficiary: to,
 		};
 		let index: u32 = 1000;
 		let when = <frame_system::Pallet<TestRuntime>>::block_number().saturating_add(1u32.into());
 
 		assert_noop!(
-			PalletSubscription::unsubscribe(origin, subscriber, subscription, when, index),
+			PalletSubscription::unsubscribe(origin, from, subscription, when, index),
 			Error::<TestRuntime>::InvalidUnsubscription
 		);
 	})
@@ -207,26 +200,23 @@ fn unsubscribe_wrong_subscription_at_index() {
 		const BOB: u64 = 2;
 
 		let origin = Origin::signed(ALICE);
-		let beneficiary = BOB;
-		let subscriber = ALICE;
+		let from = ALICE;
+		let to = BOB;
+
 		let amount = 4000;
 		let frequency = 5;
 		let number_of_installment = Some(4);
 
 		assert_ok!(PalletSubscription::subscribe(
 			origin.clone(),
-			beneficiary,
+			to,
 			amount,
 			frequency,
 			number_of_installment
 		));
 
-		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
-			beneficiary,
-			subscriber,
-			amount,
-			frequency,
-		));
+		let expected_event =
+			Event::PalletSubscription(crate::Event::Subscription(to, from, amount, frequency));
 		let received_event = &System::events()[0].event;
 
 		assert_eq!(*received_event, expected_event);
@@ -237,25 +227,22 @@ fn unsubscribe_wrong_subscription_at_index() {
 
 		const ALEX: u64 = 3;
 
-		let second_beneficiary = ALEX;
-		let second_amount = 5000;
-		let second_frequency = 2;
-		let second_number_of_installment = Some(3);
+		let to = ALEX;
+
+		let amount = 5000;
+		let frequency = 2;
+		let number_of_installment = Some(3);
 
 		assert_ok!(PalletSubscription::subscribe(
 			origin.clone(),
-			second_beneficiary,
-			second_amount,
-			second_frequency,
-			second_number_of_installment
+			to,
+			amount,
+			frequency,
+			number_of_installment
 		));
 
-		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
-			second_beneficiary,
-			subscriber,
-			second_amount,
-			second_frequency,
-		));
+		let expected_event =
+			Event::PalletSubscription(crate::Event::Subscription(to, from, amount, frequency));
 		let received_event = &System::events()[1].event;
 
 		assert_eq!(*received_event, expected_event);
@@ -268,15 +255,14 @@ fn unsubscribe_wrong_subscription_at_index() {
 			frequency,
 			amount,
 			remaining_payments,
-			beneficiary,
+			beneficiary: to,
 		};
-		let index: u32 = 1;
 		let when = <frame_system::Pallet<TestRuntime>>::block_number().saturating_add(1u32.into());
-
 		// 'index' value is purposely wrong here.
+		let index: u32 = 0;
 
 		assert_noop!(
-			PalletSubscription::unsubscribe(origin, subscriber, subscription, when, index),
+			PalletSubscription::unsubscribe(origin, from, subscription, when, index),
 			Error::<TestRuntime>::InvalidUnsubscription
 		);
 	})
@@ -291,26 +277,23 @@ fn unsubscribe_wrong_subscriber() {
 		const BOB: u64 = 2;
 
 		let origin = Origin::signed(ALICE);
-		let beneficiary = BOB;
-		let subscriber = ALICE;
+		let from = ALICE;
+		let to = BOB;
+
 		let amount = 4000;
 		let frequency = 5;
 		let number_of_installment = Some(4);
 
 		assert_ok!(PalletSubscription::subscribe(
 			origin.clone(),
-			beneficiary,
+			to,
 			amount,
 			frequency,
 			number_of_installment
 		));
 
-		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
-			beneficiary,
-			subscriber,
-			amount,
-			frequency,
-		));
+		let expected_event =
+			Event::PalletSubscription(crate::Event::Subscription(to, from, amount, frequency));
 		let received_event = &System::events()[0].event;
 
 		assert_eq!(*received_event, expected_event);
@@ -318,7 +301,8 @@ fn unsubscribe_wrong_subscriber() {
 		// ALICE has been subscribed to BOB.
 
 		const THOMAS: u64 = 100;
-		let wrong_subscriber = THOMAS;
+
+		let wrong_to = THOMAS;
 
 		let remaining_payments = number_of_installment;
 
@@ -326,13 +310,13 @@ fn unsubscribe_wrong_subscriber() {
 			frequency,
 			amount,
 			remaining_payments,
-			beneficiary,
+			beneficiary: to,
 		};
-		let index: u32 = 0;
 		let when = <frame_system::Pallet<TestRuntime>>::block_number().saturating_add(1u32.into());
+		let index: u32 = 0;
 
 		assert_noop!(
-			PalletSubscription::unsubscribe(origin, wrong_subscriber, subscription, when, index),
+			PalletSubscription::unsubscribe(origin, wrong_to, subscription, when, index),
 			Error::<TestRuntime>::InvalidUnsubscription
 		);
 	})
