@@ -107,7 +107,7 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		#[pallet::weight(1)]
+		#[pallet::weight(1_000)]
 		pub fn subscribe(
 			origin: OriginFor<T>,
 			to: T::AccountId,
@@ -150,7 +150,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::weight(1)]
+		#[pallet::weight(1_000)]
 		pub fn unsubscribe(
 			origin: OriginFor<T>,
 			subscriber: T::AccountId,
