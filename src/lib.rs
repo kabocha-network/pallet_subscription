@@ -170,8 +170,8 @@ pub mod pallet {
 
 					let desired_subscription = &(current_subscriptions[index]);
 
-					if !((*desired_subscription).0 == subscription
-						&& (*desired_subscription).1 == subscriber)
+					if !(desired_subscription.0 == subscription
+						&& desired_subscription.1 == subscriber)
 					{
 						return Err(Error::<T>::InvalidUnsubscription)
 					}
