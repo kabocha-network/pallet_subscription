@@ -47,12 +47,11 @@ fn unsubscribe() {
 			remaining_payments,
 			beneficiary: to,
 		};
-		let when = <frame_system::Pallet<TestRuntime>>::block_number().saturating_add(1u32.into());
+		let when = <frame_system::Pallet<TestRuntime>>::block_number() + 1;
 		let index: u32 = 0;
 
 		assert_ok!(PalletSubscription::unsubscribe(
 			origin,
-			from,
 			subscription.clone(),
 			when,
 			index
@@ -73,7 +72,6 @@ fn unsubscribe_no_subscriptions_found() {
 		const BOB: u64 = 2;
 
 		let origin = Origin::signed(ALICE);
-		let from = ALICE;
 		let to = BOB;
 
 		let frequency = 5;
@@ -90,7 +88,7 @@ fn unsubscribe_no_subscriptions_found() {
 		let index: u32 = 0;
 
 		assert_noop!(
-			PalletSubscription::unsubscribe(origin, from, subscription, when, index),
+			PalletSubscription::unsubscribe(origin, subscription, when, index),
 			Error::<TestRuntime>::UnknownUnsubscription
 		);
 	})
@@ -145,7 +143,7 @@ fn unsubscribe_invalid_when() {
 		let index: u32 = 0;
 
 		assert_noop!(
-			PalletSubscription::unsubscribe(origin, from, subscription, when, index),
+			PalletSubscription::unsubscribe(origin, subscription, when, index),
 			Error::<TestRuntime>::UnknownUnsubscription
 		);
 	})
@@ -197,10 +195,10 @@ fn unsubscribe_index_out_of_bounds() {
 			beneficiary: to,
 		};
 		let index: u32 = 1000;
-		let when = <frame_system::Pallet<TestRuntime>>::block_number().saturating_add(1u32.into());
+		let when = <frame_system::Pallet<TestRuntime>>::block_number() + 1;
 
 		assert_noop!(
-			PalletSubscription::unsubscribe(origin, from, subscription, when, index),
+			PalletSubscription::unsubscribe(origin, subscription, when, index),
 			Error::<TestRuntime>::InvalidUnsubscription
 		);
 	})
@@ -282,12 +280,12 @@ fn unsubscribe_wrong_subscription_at_index() {
 			remaining_payments,
 			beneficiary: to,
 		};
-		let when = <frame_system::Pallet<TestRuntime>>::block_number().saturating_add(1u32.into());
+		let when = <frame_system::Pallet<TestRuntime>>::block_number() + 1;
 		// 'index' value is purposely wrong here.
 		let index: u32 = 0;
 
 		assert_noop!(
-			PalletSubscription::unsubscribe(origin, from, subscription, when, index),
+			PalletSubscription::unsubscribe(origin, subscription, when, index),
 			Error::<TestRuntime>::InvalidUnsubscription
 		);
 	})
@@ -332,7 +330,7 @@ fn unsubscribe_wrong_subscriber() {
 
 		const THOMAS: u64 = 100;
 
-		let wrong_to = THOMAS;
+		let wrong_origin = Origin::signed(THOMAS);
 
 		let remaining_payments = number_of_installment;
 
@@ -342,11 +340,11 @@ fn unsubscribe_wrong_subscriber() {
 			remaining_payments,
 			beneficiary: to,
 		};
-		let when = <frame_system::Pallet<TestRuntime>>::block_number().saturating_add(1u32.into());
+		let when = <frame_system::Pallet<TestRuntime>>::block_number() + 1;
 		let index: u32 = 0;
 
 		assert_noop!(
-			PalletSubscription::unsubscribe(origin, wrong_to, subscription, when, index),
+			PalletSubscription::unsubscribe(wrong_origin, subscription, when, index),
 			Error::<TestRuntime>::InvalidUnsubscription
 		);
 	})
