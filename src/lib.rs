@@ -23,7 +23,7 @@ pub use frame_support::{
 pub mod pallet {
 
 	use super::*;
-	use frame_support::{pallet_prelude::*, sp_runtime::traits::Zero};
+	use frame_support::{pallet_prelude::*, sp_runtime::traits::Zero, serde::__private::de};
 	use frame_system::pallet_prelude::*;
 
 	#[pallet::config]
@@ -170,6 +170,8 @@ pub mod pallet {
 		) -> DispatchResult {
 			let from = ensure_signed(origin)?;
 
+			let mut found_subscription = subscription.clone();
+
 			<Subscriptions<T>>::mutate(when, |wrapped_current_subscriptions| {
 				if let Some(current_subscriptions) = wrapped_current_subscriptions {
 					let index = index as usize;
@@ -188,6 +190,7 @@ pub mod pallet {
 						return Err(Error::<T>::SubscriptionAtIndexDoesNotMatch)
 					}
 
+					found_subscription = desired_subscription.0.clone();
 					current_subscriptions.remove(index);
 					Ok(())
 				} else {
@@ -195,7 +198,7 @@ pub mod pallet {
 				}
 			})?;
 
-			Self::deposit_event(Event::Unsubscription(subscription, from));
+			Self::deposit_event(Event::Unsubscription(found_subscription, from));
 			Ok(())
 		}
 	}
