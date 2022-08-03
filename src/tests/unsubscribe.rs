@@ -64,7 +64,6 @@ fn unsubscribe() {
 fn unsubscribe_no_subscriptions_found() {
 	ExternalityBuilder::build().execute_with(|| {
 		const ALICE: u64 = 1;
-		const BOB: u64 = 2;
 
 		let origin = Origin::signed(ALICE);
 
