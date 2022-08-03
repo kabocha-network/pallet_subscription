@@ -19,8 +19,6 @@ pub use frame_support::{
 	ReversibleStorageHasher,
 };
 
-use sp_runtime::traits::Saturating;
-
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
@@ -135,8 +133,7 @@ pub mod pallet {
 
 			let new_subscription = (subscription, from.clone());
 
-			let next_block_number =
-				<frame_system::Pallet<T>>::block_number().saturating_add(1u32.into());
+			let next_block_number = <frame_system::Pallet<T>>::block_number() + 1u32.into();
 
 			<Subscriptions<T>>::mutate(next_block_number, |wrapped_current_subscriptions| {
 				if let Some(current_subscriptions) = wrapped_current_subscriptions {
