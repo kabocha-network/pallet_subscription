@@ -92,7 +92,6 @@ pub mod pallet {
 	#[pallet::error]
 	pub enum Error<T> {
 		InvalidSubscription,
-		SubscriptionAtIndexDoesNotMatch,
 		IndexOutOfBounds,
 		NoSubscriptionPlannedAtBlock,
 		CallerIsNotSubscriber,
