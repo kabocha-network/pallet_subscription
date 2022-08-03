@@ -199,7 +199,7 @@ fn unsubscribe_index_out_of_bounds() {
 
 		assert_noop!(
 			PalletSubscription::unsubscribe(origin, subscription, when, index),
-			Error::<TestRuntime>::InvalidUnsubscription
+			Error::<TestRuntime>::InvalidUnsubscriptionIndexSize
 		);
 	})
 }
@@ -286,7 +286,7 @@ fn unsubscribe_wrong_subscription_at_index() {
 
 		assert_noop!(
 			PalletSubscription::unsubscribe(origin, subscription, when, index),
-			Error::<TestRuntime>::InvalidUnsubscription
+			Error::<TestRuntime>::InvalidUnsubscriptionMatch
 		);
 	})
 }
@@ -345,7 +345,7 @@ fn unsubscribe_wrong_subscriber() {
 
 		assert_noop!(
 			PalletSubscription::unsubscribe(wrong_origin, subscription, when, index),
-			Error::<TestRuntime>::InvalidUnsubscription
+			Error::<TestRuntime>::InvalidUnsubscriptionMatch
 		);
 	})
 }

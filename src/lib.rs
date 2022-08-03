@@ -94,6 +94,8 @@ pub mod pallet {
 		InvalidSubscription,
 		UnknownUnsubscription,
 		InvalidUnsubscription,
+		InvalidUnsubscriptionIndexSize,
+		InvalidUnsubscriptionMatch
 	}
 
 	#[pallet::hooks]
@@ -173,7 +175,7 @@ pub mod pallet {
 					let index = index as usize;
 
 					if index >= current_subscriptions.len() {
-						return Err(Error::<T>::InvalidUnsubscription)
+						return Err(Error::<T>::InvalidUnsubscriptionIndexSize)
 					}
 
 					let desired_subscription = &(current_subscriptions[index]);
@@ -181,7 +183,7 @@ pub mod pallet {
 					if !(desired_subscription.0 == subscription
 						&& desired_subscription.1 == from)
 					{
-						return Err(Error::<T>::InvalidUnsubscription)
+						return Err(Error::<T>::InvalidUnsubscriptionMatch)
 					}
 
 					current_subscriptions.remove(index);
