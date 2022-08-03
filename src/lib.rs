@@ -164,13 +164,10 @@ pub mod pallet {
 		#[pallet::weight(1_000)]
 		pub fn unsubscribe(
 			origin: OriginFor<T>,
-			subscription: Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
 			when: T::BlockNumber,
 			index: u32,
 		) -> DispatchResult {
 			let from = ensure_signed(origin)?;
-
-			let mut found_subscription = subscription.clone();
 
 			<Subscriptions<T>>::mutate(when, |wrapped_current_subscriptions| {
 				if let Some(current_subscriptions) = wrapped_current_subscriptions {
@@ -186,19 +183,15 @@ pub mod pallet {
 						return Err(Error::<T>::CallerIsNotSubscriber)
 					}
 
-					if desired_subscription.0 != subscription {
-						return Err(Error::<T>::SubscriptionAtIndexDoesNotMatch)
-					}
+					let subscription = desired_subscription.0.clone();
 
-					found_subscription = desired_subscription.0.clone();
 					current_subscriptions.remove(index);
+					Self::deposit_event(Event::Unsubscription(subscription, from));
 					Ok(())
 				} else {
 					Err(Error::<T>::NoSubscriptionPlannedAtBlock)
 				}
 			})?;
-
-			Self::deposit_event(Event::Unsubscription(found_subscription, from));
 			Ok(())
 		}
 	}

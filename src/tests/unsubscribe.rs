@@ -50,12 +50,7 @@ fn unsubscribe() {
 		let when = <frame_system::Pallet<TestRuntime>>::block_number() + 1;
 		let index: u32 = 0;
 
-		assert_ok!(PalletSubscription::unsubscribe(
-			origin,
-			subscription.clone(),
-			when,
-			index
-		));
+		assert_ok!(PalletSubscription::unsubscribe(origin, when, index));
 
 		let expected_event =
 			Event::PalletSubscription(crate::Event::Unsubscription(subscription, from));
@@ -72,23 +67,12 @@ fn unsubscribe_no_subscriptions_found() {
 		const BOB: u64 = 2;
 
 		let origin = Origin::signed(ALICE);
-		let to = BOB;
 
-		let frequency = 5;
-		let amount = 4000;
-		let remaining_payments = Some(4);
-
-		let subscription = Subscription {
-			frequency,
-			amount,
-			remaining_payments,
-			beneficiary: to,
-		};
 		let when = 1000;
 		let index: u32 = 0;
 
 		assert_noop!(
-			PalletSubscription::unsubscribe(origin, subscription, when, index),
+			PalletSubscription::unsubscribe(origin, when, index),
 			Error::<TestRuntime>::NoSubscriptionPlannedAtBlock
 		);
 	})
@@ -131,19 +115,11 @@ fn unsubscribe_invalid_when() {
 
 		// ALICE has been subscribed to BOB.
 
-		let remaining_payments = number_of_installment;
-
-		let subscription = Subscription {
-			frequency,
-			amount,
-			remaining_payments,
-			beneficiary: to,
-		};
 		let when = 1000;
 		let index: u32 = 0;
 
 		assert_noop!(
-			PalletSubscription::unsubscribe(origin, subscription, when, index),
+			PalletSubscription::unsubscribe(origin, when, index),
 			Error::<TestRuntime>::NoSubscriptionPlannedAtBlock
 		);
 	})
@@ -186,19 +162,11 @@ fn unsubscribe_index_out_of_bounds() {
 
 		// ALICE has been subscribed to BOB.
 
-		let remaining_payments = number_of_installment;
-
-		let subscription = Subscription {
-			frequency,
-			amount,
-			remaining_payments,
-			beneficiary: to,
-		};
 		let index: u32 = 1000;
 		let when = <frame_system::Pallet<TestRuntime>>::block_number() + 1;
 
 		assert_noop!(
-			PalletSubscription::unsubscribe(origin, subscription, when, index),
+			PalletSubscription::unsubscribe(origin, when, index),
 			Error::<TestRuntime>::IndexOutOfBounds
 		);
 	})
@@ -272,20 +240,12 @@ fn unsubscribe_wrong_subscription_at_index() {
 
 		// ALICE has been subscribed to ALEX.
 
-		let remaining_payments = number_of_installment;
-
-		let subscription = Subscription {
-			frequency,
-			amount,
-			remaining_payments,
-			beneficiary: to,
-		};
 		let when = <frame_system::Pallet<TestRuntime>>::block_number() + 1;
 		// 'index' value is purposely wrong here.
 		let index: u32 = 0;
 
 		assert_noop!(
-			PalletSubscription::unsubscribe(origin, subscription, when, index),
+			PalletSubscription::unsubscribe(origin, when, index),
 			Error::<TestRuntime>::SubscriptionAtIndexDoesNotMatch
 		);
 	})
@@ -332,19 +292,11 @@ fn unsubscribe_wrong_subscriber() {
 
 		let wrong_origin = Origin::signed(THOMAS);
 
-		let remaining_payments = number_of_installment;
-
-		let subscription = Subscription {
-			frequency,
-			amount,
-			remaining_payments,
-			beneficiary: to,
-		};
 		let when = <frame_system::Pallet<TestRuntime>>::block_number() + 1;
 		let index: u32 = 0;
 
 		assert_noop!(
-			PalletSubscription::unsubscribe(wrong_origin, subscription, when, index),
+			PalletSubscription::unsubscribe(wrong_origin, when, index),
 			Error::<TestRuntime>::CallerIsNotSubscriber
 		);
 	})
