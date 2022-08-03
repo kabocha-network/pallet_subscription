@@ -92,10 +92,10 @@ pub mod pallet {
 	#[pallet::error]
 	pub enum Error<T> {
 		InvalidSubscription,
-		UnknownUnsubscription,
-		InvalidUnsubscription,
-		InvalidUnsubscriptionIndexSize,
-		InvalidUnsubscriptionMatch
+		SubscriptionAtIndexDoesNotMatch,
+		IndexOutOfBounds,
+		NoSubscriptionPlannedAtBlock,
+		CallerIsNotSubscriber
 	}
 
 	#[pallet::hooks]
@@ -175,21 +175,23 @@ pub mod pallet {
 					let index = index as usize;
 
 					if index >= current_subscriptions.len() {
-						return Err(Error::<T>::InvalidUnsubscriptionIndexSize)
+						return Err(Error::<T>::IndexOutOfBounds)
 					}
 
 					let desired_subscription = &(current_subscriptions[index]);
 
-					if !(desired_subscription.0 == subscription
-						&& desired_subscription.1 == from)
-					{
-						return Err(Error::<T>::InvalidUnsubscriptionMatch)
+					if desired_subscription.1 != from {
+						return Err(Error::<T>::CallerIsNotSubscriber);
+					}
+
+					if desired_subscription.0 != subscription {
+						return Err(Error::<T>::SubscriptionAtIndexDoesNotMatch)
 					}
 
 					current_subscriptions.remove(index);
 					Ok(())
 				} else {
-					Err(Error::<T>::UnknownUnsubscription)
+					Err(Error::<T>::NoSubscriptionPlannedAtBlock)
 				}
 			})?;
 
