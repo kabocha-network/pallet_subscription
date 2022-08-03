@@ -21,6 +21,7 @@ pub use frame_support::{
 
 #[frame_support::pallet]
 pub mod pallet {
+
 	use super::*;
 	use frame_support::{pallet_prelude::*, sp_runtime::traits::Zero};
 	use frame_system::pallet_prelude::*;
@@ -75,8 +76,13 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		/// Subscription has been created
-		Subscription(T::AccountId, T::AccountId, BalanceOf<T>, T::BlockNumber),
+		Subscription(
+			T::AccountId,
+			T::AccountId,
+			BalanceOf<T>,
+			T::BlockNumber,
+			Option<u32>,
+		),
 		Unsubscription(
 			Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
 			T::AccountId,
@@ -143,7 +149,13 @@ pub mod pallet {
 				}
 			});
 
-			Self::deposit_event(Event::Subscription(to, from, amount, frequency));
+			Self::deposit_event(Event::Subscription(
+				from,
+				to,
+				amount,
+				frequency,
+				number_of_installment,
+			));
 			Ok(())
 		}
 

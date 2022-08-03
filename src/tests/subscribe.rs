@@ -24,8 +24,13 @@ fn subscribe() {
 			number_of_installment
 		));
 
-		let expected_event =
-			Event::PalletSubscription(crate::Event::Subscription(to, from, amount, frequency));
+		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
+			from,
+			to,
+			amount,
+			frequency,
+			number_of_installment,
+		));
 		let received_event = &System::events()[0].event;
 
 		assert_eq!(*received_event, expected_event);
@@ -104,8 +109,13 @@ fn subscribe_multiple_events() {
 			number_of_installment
 		));
 
-		let expected_event =
-			Event::PalletSubscription(crate::Event::Subscription(to, from, amount, frequency));
+		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
+			from,
+			to,
+			amount,
+			frequency,
+			number_of_installment,
+		));
 		let received_event = &System::events()[0].event;
 
 		assert_eq!(*received_event, expected_event);
@@ -131,8 +141,13 @@ fn subscribe_multiple_events() {
 			number_of_installment
 		));
 
-		let expected_event =
-			Event::PalletSubscription(crate::Event::Subscription(to, from, amount, frequency));
+		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
+			from,
+			to,
+			amount,
+			frequency,
+			number_of_installment,
+		));
 		let received_event = &System::events()[1].event;
 
 		assert_eq!(*received_event, expected_event);
@@ -158,8 +173,13 @@ fn subscribe_multiple_events() {
 			number_of_installment
 		));
 
-		let expected_event =
-			Event::PalletSubscription(crate::Event::Subscription(to, from, amount, frequency));
+		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
+			from,
+			to,
+			amount,
+			frequency,
+			number_of_installment,
+		));
 		let received_event = &System::events()[2].event;
 
 		assert_eq!(*received_event, expected_event);
@@ -248,8 +268,13 @@ fn subscribe_number_of_installment_none() {
 			number_of_installment
 		));
 
-		let expected_event =
-			Event::PalletSubscription(crate::Event::Subscription(to, from, amount, frequency));
+		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
+			from,
+			to,
+			amount,
+			frequency,
+			number_of_installment,
+		));
 		let received_event = &System::events()[0].event;
 
 		assert_eq!(*received_event, expected_event);

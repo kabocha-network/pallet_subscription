@@ -26,8 +26,13 @@ fn unsubscribe() {
 			number_of_installment
 		));
 
-		let expected_event =
-			Event::PalletSubscription(crate::Event::Subscription(to, from, amount, frequency));
+		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
+			from,
+			to,
+			amount,
+			frequency,
+			number_of_installment,
+		));
 		let received_event = &System::events()[0].event;
 
 		assert_eq!(*received_event, expected_event);
@@ -115,8 +120,13 @@ fn unsubscribe_invalid_when() {
 			number_of_installment
 		));
 
-		let expected_event =
-			Event::PalletSubscription(crate::Event::Subscription(to, from, amount, frequency));
+		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
+			from,
+			to,
+			amount,
+			frequency,
+			number_of_installment,
+		));
 		let received_event = &System::events()[0].event;
 
 		assert_eq!(*received_event, expected_event);
@@ -165,8 +175,13 @@ fn unsubscribe_index_out_of_bounds() {
 			number_of_installment
 		));
 
-		let expected_event =
-			Event::PalletSubscription(crate::Event::Subscription(to, from, amount, frequency));
+		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
+			from,
+			to,
+			amount,
+			frequency,
+			number_of_installment,
+		));
 		let received_event = &System::events()[0].event;
 
 		assert_eq!(*received_event, expected_event);
@@ -215,8 +230,13 @@ fn unsubscribe_wrong_subscription_at_index() {
 			number_of_installment
 		));
 
-		let expected_event =
-			Event::PalletSubscription(crate::Event::Subscription(to, from, amount, frequency));
+		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
+			from,
+			to,
+			amount,
+			frequency,
+			number_of_installment,
+		));
 		let received_event = &System::events()[0].event;
 
 		assert_eq!(*received_event, expected_event);
@@ -241,8 +261,13 @@ fn unsubscribe_wrong_subscription_at_index() {
 			number_of_installment
 		));
 
-		let expected_event =
-			Event::PalletSubscription(crate::Event::Subscription(to, from, amount, frequency));
+		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
+			from,
+			to,
+			amount,
+			frequency,
+			number_of_installment,
+		));
 		let received_event = &System::events()[1].event;
 
 		assert_eq!(*received_event, expected_event);
@@ -292,8 +317,13 @@ fn unsubscribe_wrong_subscriber() {
 			number_of_installment
 		));
 
-		let expected_event =
-			Event::PalletSubscription(crate::Event::Subscription(to, from, amount, frequency));
+		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
+			from,
+			to,
+			amount,
+			frequency,
+			number_of_installment,
+		));
 		let received_event = &System::events()[0].event;
 
 		assert_eq!(*received_event, expected_event);
