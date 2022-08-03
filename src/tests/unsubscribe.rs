@@ -308,7 +308,7 @@ fn unsubscribe_wrong_subscriber() {
 		let number_of_installment = Some(4);
 
 		assert_ok!(PalletSubscription::subscribe(
-			origin.clone(),
+			origin,
 			to,
 			amount,
 			frequency,

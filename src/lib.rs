@@ -23,7 +23,7 @@ pub use frame_support::{
 pub mod pallet {
 
 	use super::*;
-	use frame_support::{pallet_prelude::*, sp_runtime::traits::Zero, serde::__private::de};
+	use frame_support::{pallet_prelude::*, sp_runtime::traits::Zero};
 	use frame_system::pallet_prelude::*;
 
 	#[pallet::config]
@@ -95,7 +95,7 @@ pub mod pallet {
 		SubscriptionAtIndexDoesNotMatch,
 		IndexOutOfBounds,
 		NoSubscriptionPlannedAtBlock,
-		CallerIsNotSubscriber
+		CallerIsNotSubscriber,
 	}
 
 	#[pallet::hooks]
@@ -183,7 +183,7 @@ pub mod pallet {
 					let desired_subscription = &(current_subscriptions[index]);
 
 					if desired_subscription.1 != from {
-						return Err(Error::<T>::CallerIsNotSubscriber);
+						return Err(Error::<T>::CallerIsNotSubscriber)
 					}
 
 					if desired_subscription.0 != subscription {
