@@ -35,6 +35,7 @@ pub mod pallet {
 		/// The maximum amount of metadata
 		#[pallet::constant]
 		type MaxMetadataLength: Get<u32>;
+		/////!TODO: add a u32 type that represent the maximum weigth the hook is allowed to take
 	}
 
 	#[pallet::pallet]
@@ -99,14 +100,43 @@ pub mod pallet {
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-		fn on_initialize(_n: T::BlockNumber) -> Weight {
-			//// prop 1:
-			// - loop over all subscriptions (.iter_values())
-			// - check if the subscription shoud be taken
-			// - take it
+		fn on_initialize(n: T::BlockNumber) -> Weight {
+			//!TODO: déjà la première chose, c'est qu'on soit sur que la weight de la hook prenne
+			// pas plus que prévu. du coup on introduit un type (l 38) qui représente ca, et on
+			// l'utilise plus tard
+			let current_weight: u64 = 0; //u64 psk on veut retourner ca, et Weight c'est un u64
+			//
+			// Nous, on va utiliser le storage Subscription. c'est une map, donc une seule clef, et
+			// cette clef, c'est un blocknumber, donc parfait, on en a un qui est envoyé par la
+			// hook: n
+			//
+			// donc qqch du genre:
+		let subscriptions = Subscriptions<T>.take(n); // ptet pas la bonne syntaxe, regarde plus bas
+													  // comment c'est utilisé
+			// si c'est None, tu return 0, sinon tu continue. tu peux faire ca dans un if let c plus
+			// simple
+			//
+			if let Some(subs) = subscriptions {
+				// la subs c'est un vec de tuple, donc tu peux déconstruire:
+				for (sub, src) in subs {
+					// la plusieurs step:
+					// faire un balance transfer de `sub.amount` de `src` vers `sub.benef`
+					// si y'a un remaining payment:
+					// // si c'est 1, tu fais rien et passe a la subscription suivante (donc tu drop
+					// // celle ci)
+					// // si c'est > 1, tu decrease de 1
+					//
+				//	et tu reschedule le prochain payment au prochain blocknumber, donc faut que tu
+					//	fasse un Subscription<T>.mutate(n + frequency, |smth| {et tu ajoute la
+					//	subscription a smth})
+				}
+				//ce qui serait bien, c'est que tu trouve un moyen de chopper la weight d'un read et
+				//d'un write, et que a chaque fois que tu fais une des deux op, tu ajoute la weight
+				//a `current_weight`, comme ca la hook est pixel. jpense tu peux regarder supersig
+				//dans weight.rs
+			}
 
-			//// prop 2: (2nd key: )
-			0
+			current_weight
 		}
 	}
 
