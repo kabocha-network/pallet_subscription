@@ -32,9 +32,15 @@ pub mod pallet {
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
 		/// The trait to manage funds
 		type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
+		/// Weight information for extrinsics in this pallet.
+		// type WeightInfo: WeightInfo;
 		/// The maximum amount of metadata
 		#[pallet::constant]
 		type MaxMetadataLength: Get<u32>;
+		/// The maximum weight that may be scheduled per block for any dispatchables of less
+		/// priority than `schedule::HARD_DEADLINE`.
+		#[pallet::constant]
+		type MaximumWeight: Get<Weight>;
 	}
 
 	#[pallet::pallet]
@@ -51,7 +57,7 @@ pub mod pallet {
 		_,
 		Twox64Concat,
 		PlanId,
-		Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
+		InstalmentData<T::BlockNumber, BalanceOf<T>, T::AccountId>,
 		OptionQuery,
 	>;
 
@@ -66,27 +72,15 @@ pub mod pallet {
 		_,
 		Twox64Concat,
 		T::BlockNumber,
-		Vec<(
-			Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
-			T::AccountId,
-		)>,
-		OptionQuery,
+		Vec<InstalmentData<T::BlockNumber, BalanceOf<T>, T::AccountId>>,
+		ValueQuery,
 	>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		Subscription(
-			T::AccountId,
-			T::AccountId,
-			BalanceOf<T>,
-			T::BlockNumber,
-			Option<u32>,
-		),
-		Unsubscription(
-			Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
-			T::AccountId,
-		),
+		Subscription(InstalmentData<T::BlockNumber, BalanceOf<T>, T::AccountId>),
+		Unsubscription(InstalmentData<T::BlockNumber, BalanceOf<T>, T::AccountId>),
 	}
 
 	#[pallet::error]
@@ -99,14 +93,66 @@ pub mod pallet {
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-		fn on_initialize(_n: T::BlockNumber) -> Weight {
-			//// prop 1:
-			// - loop over all subscriptions (.iter_values())
-			// - check if the subscription shoud be taken
-			// - take it
+		fn on_initialize(block_number: T::BlockNumber) -> Weight {
+			let limit = T::MaximumWeight::get();
+			let mut total_weight: Weight = 0;
 
-			//// prop 2: (2nd key: )
-			0
+			let mut scheduled_subscriptions = <Subscriptions<T>>::take(block_number);
+			total_weight += T::DbWeight::get().reads_writes(1 as Weight, 1 as Weight);
+
+			while total_weight < limit {
+				let sub_info = match scheduled_subscriptions.pop() {
+					Some(data) => data,
+					None => return total_weight,
+				};
+
+				let res_transfer = T::Currency::transfer(
+					&sub_info.payer,
+					&sub_info.beneficiary,
+					sub_info.amount,
+					ExistenceRequirement::KeepAlive,
+				);
+				// TODO: benchmark what costs a call to transfer and add it to total_weight
+				// For now let's use this
+				total_weight += T::DbWeight::get().reads_writes(1 as Weight, 1 as Weight);
+
+				// Cases where we don't want to execute another instalment of this subscription
+				if res_transfer.is_err() {
+					continue
+				}
+				if let Some(1) = sub_info.remaining_payments {
+					continue
+				}
+
+				match sub_info.remaining_payments {
+					Some(remaining_payments) => {
+						Self::schedule_subscriptions(
+							block_number + sub_info.frequency,
+							&[InstalmentData {
+								remaining_payments: Some(remaining_payments - 1),
+								..sub_info
+							}],
+						);
+					},
+					None => {
+						Self::schedule_subscriptions(
+							block_number + sub_info.frequency,
+							&[sub_info],
+						);
+					},
+				}
+				total_weight += T::DbWeight::get().reads_writes(1 as Weight, 1 as Weight);
+			}
+
+			if !scheduled_subscriptions.is_empty() {
+				Self::schedule_subscriptions(
+					block_number + T::BlockNumber::from(1u32),
+					&scheduled_subscriptions,
+				);
+				total_weight += T::DbWeight::get().reads_writes(1 as Weight, 1 as Weight);
+			}
+
+			total_weight
 		}
 	}
 
@@ -131,32 +177,19 @@ pub mod pallet {
 				Error::<T>::InvalidSubscription
 			);
 
-			let subscription = Subscription {
+			let subscription = InstalmentData {
 				frequency,
 				amount,
 				remaining_payments: number_of_installment,
-				beneficiary: to.clone(),
+				beneficiary: to,
+				payer: from,
 			};
-
-			let new_subscription = (subscription, from.clone());
 
 			let next_block_number = <frame_system::Pallet<T>>::block_number() + 1u32.into();
 
-			<Subscriptions<T>>::mutate(next_block_number, |wrapped_current_subscriptions| {
-				if let Some(current_subscriptions) = wrapped_current_subscriptions {
-					current_subscriptions.push(new_subscription);
-				} else {
-					*wrapped_current_subscriptions = Some(vec![new_subscription]);
-				}
-			});
+			Self::schedule_subscriptions(next_block_number, &[subscription.clone()]);
 
-			Self::deposit_event(Event::Subscription(
-				from,
-				to,
-				amount,
-				frequency,
-				number_of_installment,
-			));
+			Self::deposit_event(Event::Subscription(subscription));
 			Ok(())
 		}
 
@@ -168,30 +201,45 @@ pub mod pallet {
 		) -> DispatchResult {
 			let from = ensure_signed(origin)?;
 
-			<Subscriptions<T>>::mutate(when, |wrapped_current_subscriptions| {
-				if let Some(current_subscriptions) = wrapped_current_subscriptions {
-					let index = index as usize;
+			let mut instalments = Self::subscriptions(when);
+			ensure!(
+				!instalments.is_empty(),
+				Error::<T>::NoSubscriptionPlannedAtBlock,
+			);
 
-					if index >= current_subscriptions.len() {
-						return Err(Error::<T>::IndexOutOfBounds)
-					}
+			let index = index as usize;
+			let length = instalments.len();
 
-					let desired_subscription = &(current_subscriptions[index]);
+			ensure!(index < length, Error::<T>::IndexOutOfBounds,);
 
-					if desired_subscription.1 != from {
-						return Err(Error::<T>::CallerIsNotSubscriber)
-					}
+			let desired_subscription = &instalments[index];
 
-					let subscription = desired_subscription.0.clone();
+			ensure!(
+				desired_subscription.payer == from,
+				Error::<T>::CallerIsNotSubscriber,
+			);
 
-					current_subscriptions.remove(index);
-					Self::deposit_event(Event::Unsubscription(subscription, from));
-					Ok(())
-				} else {
-					Err(Error::<T>::NoSubscriptionPlannedAtBlock)
-				}
-			})?;
+			// Those two lines are safe because we checked index < length
+			// Doing this rather than calling remove reduce complexity to 0(1)
+			instalments.swap(index, length - 1);
+			let subscription_data = instalments.pop().unwrap();
+
+			<Subscriptions<T>>::insert(when, instalments);
+
+			Self::deposit_event(Event::Unsubscription(subscription_data));
+
 			Ok(())
+		}
+	}
+
+	impl<T: Config> Pallet<T> {
+		fn schedule_subscriptions(
+			when: T::BlockNumber,
+			new_subscription: &[InstalmentData<T::BlockNumber, BalanceOf<T>, T::AccountId>],
+		) {
+			<Subscriptions<T>>::mutate(when, |current_subscriptions| {
+				current_subscriptions.extend_from_slice(new_subscription);
+			});
 		}
 	}
 }

@@ -1263,12 +1263,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
+name = "pallet-balances"
+version = "4.0.0-dev"
+source = "git+https://github.com/paritytech/substrate.git?branch=polkadot-v0.9.23#76522d7937ba94ff1becef4e4e3ca78e3e1de341"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "log",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "pallet-subscription"
 version = "4.0.0-dev"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
  "frame-system",
+ "pallet-balances",
  "parity-scale-codec",
  "scale-info",
  "sp-core",
