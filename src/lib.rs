@@ -118,7 +118,7 @@ pub mod pallet {
 			while total_weight < limit {
 				let (sub_info, from) = match scheduled_subscriptions.pop() {
 					Some(data) => data,
-					None => break,
+					None => return total_weight,
 				};
 
 				let res_transfer = T::Currency::transfer(
@@ -127,7 +127,7 @@ pub mod pallet {
 					sub_info.amount,
 					ExistenceRequirement::KeepAlive,
 				);
-				// TODO: benchmark what cost a call to transfer and add it to total_weight
+				// TODO: benchmark what costs a call to transfer and add it to total_weight
 				// For now let's use this
 				total_weight += T::DbWeight::get().reads_writes(1 as Weight, 1 as Weight);
 
@@ -159,8 +159,7 @@ pub mod pallet {
 						);
 					},
 				}
-
-				total_weight += T::DbWeight::get().writes(1 as Weight);
+				total_weight += T::DbWeight::get().reads_writes(1 as Weight, 1 as Weight);
 			}
 
 			if !scheduled_subscriptions.is_empty() {
@@ -168,6 +167,7 @@ pub mod pallet {
 					block_number + T::BlockNumber::from(1u32),
 					&scheduled_subscriptions,
 				);
+				total_weight += T::DbWeight::get().reads_writes(1 as Weight, 1 as Weight);
 			}
 
 			total_weight
