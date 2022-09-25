@@ -125,6 +125,48 @@ fn caped_instalment_subscription() {
 			Balances::free_balance(&BOB()),
 			bob_balance_before + amount * 10
 		);
+		let subscriptions_to_come =
+			PalletSubscription::subscriptions(2 + frequency * recurence.unwrap() as u64);
+		assert!(subscriptions_to_come.is_none())
+	})
+}
+
+#[test]
+fn transfer_failed() {
+	ExternalityBuilder::default().build().execute_with(|| {
+		let alice_balance_before = Balances::free_balance(&ALICE());
+		let bob_balance_before = Balances::free_balance(&BOB());
+
+		let amount = alice_balance_before / 2 + 1;
+		let frequency = 5;
+		let beneficiary = BOB();
+		let recurence = None;
+
+		assert_ok!(PalletSubscription::subscribe(
+			Origin::signed(ALICE()),
+			beneficiary.clone(),
+			amount,
+			frequency,
+			recurence,
+		));
+
+		// First execution work like a charm
+		run_to_block(2);
+		assert_eq!(
+			Balances::free_balance(&ALICE()),
+			alice_balance_before - amount
+		);
+		assert_eq!(Balances::free_balance(&BOB()), bob_balance_before + amount);
+
+		// Balance did not change
+		run_to_block(2 + frequency);
+		assert_eq!(
+			Balances::free_balance(&ALICE()),
+			alice_balance_before - amount
+		);
+		assert_eq!(Balances::free_balance(&BOB()), bob_balance_before + amount);
+
+		// Won't be executed anymore
 		let subscriptions_to_come = PalletSubscription::subscriptions(2 + frequency * 10);
 		assert!(subscriptions_to_come.is_none())
 	})

@@ -121,7 +121,7 @@ pub mod pallet {
 					None => break,
 				};
 
-				let _ = T::Currency::transfer(
+				let res_transfer = T::Currency::transfer(
 					&from,
 					&sub_info.beneficiary,
 					sub_info.amount,
@@ -131,6 +131,10 @@ pub mod pallet {
 				// For now let's use this
 				total_weight += T::DbWeight::get().reads_writes(1 as Weight, 1 as Weight);
 
+				// Cases where we don't want to execute another instalment of this subscription
+				if res_transfer.is_err() {
+					continue
+				}
 				if let Some(1) = sub_info.remaining_payments {
 					continue
 				}
