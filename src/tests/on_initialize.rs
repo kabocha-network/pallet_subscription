@@ -15,7 +15,7 @@ fn trigger_hook_once_transfer_funds() {
 
 		assert_ok!(PalletSubscription::subscribe(
 			Origin::signed(ALICE()),
-			beneficiary.clone(),
+			beneficiary,
 			amount,
 			frequency,
 			recurence,
@@ -132,7 +132,7 @@ fn transfer_failed() {
 
 		assert_ok!(PalletSubscription::subscribe(
 			Origin::signed(ALICE()),
-			beneficiary.clone(),
+			beneficiary,
 			amount,
 			frequency,
 			recurence,

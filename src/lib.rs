@@ -181,8 +181,8 @@ pub mod pallet {
 				frequency,
 				amount,
 				remaining_payments: number_of_installment,
-				beneficiary: to.clone(),
-				payer: from.clone(),
+				beneficiary: to,
+				payer: from,
 			};
 
 			let next_block_number = <frame_system::Pallet<T>>::block_number() + 1u32.into();
@@ -226,7 +226,7 @@ pub mod pallet {
 
 			<Subscriptions<T>>::insert(when, instalments);
 
-			Self::deposit_event(Event::Unsubscription(subscription_data.clone()));
+			Self::deposit_event(Event::Unsubscription(subscription_data));
 
 			Ok(())
 		}
