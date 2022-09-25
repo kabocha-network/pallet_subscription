@@ -68,12 +68,13 @@ impl frame_system::Config for TestRuntime {
 parameter_types! {
 	pub MaximumWeight: Weight = Perbill::from_percent(80) *
 		BlockWeights::get().max_block;
+	pub MaxMetadataLength: u32 = 128u32;
 }
 
 impl Config for TestRuntime {
 	type Currency = Balances;
 	type Event = Event;
-	type MaxMetadataLength = ();
+	type MaxMetadataLength = MaxMetadataLength;
 	type MaximumWeight = MaximumWeight;
 }
 

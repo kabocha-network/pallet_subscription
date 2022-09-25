@@ -18,3 +18,11 @@ pub struct InstalmentData<BlockNumber, Balance, AccountId> {
 	pub beneficiary: AccountId,
 	pub payer: AccountId,
 }
+
+#[derive(Debug, Clone, TypeInfo, Encode, Decode, MaxEncodedLen, PartialEq, Eq)]
+pub struct PlanData<BlockNumber, Balance, AccountId> {
+	pub frequency: BlockNumber,
+	pub amount: Balance,
+	pub remaining_payments: Option<u32>,
+	pub beneficiary: AccountId,
+}

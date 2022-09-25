@@ -23,7 +23,7 @@ pub use frame_support::{
 pub mod pallet {
 
 	use super::*;
-	use frame_support::{pallet_prelude::*, sp_runtime::traits::Zero};
+	use frame_support::{pallet_prelude::*, sp_runtime::traits::Zero, BoundedVec};
 	use frame_system::pallet_prelude::*;
 
 	#[pallet::config]
@@ -57,7 +57,10 @@ pub mod pallet {
 		_,
 		Twox64Concat,
 		PlanId,
-		InstalmentData<T::BlockNumber, BalanceOf<T>, T::AccountId>,
+		(
+			PlanData<T::BlockNumber, BalanceOf<T>, T::AccountId>,
+			BoundedVec<u8, T::MaxMetadataLength>,
+		),
 		OptionQuery,
 	>;
 
@@ -81,11 +84,15 @@ pub mod pallet {
 	pub enum Event<T: Config> {
 		Subscription(InstalmentData<T::BlockNumber, BalanceOf<T>, T::AccountId>),
 		Unsubscription(InstalmentData<T::BlockNumber, BalanceOf<T>, T::AccountId>),
+		PlanCreated(PlanId, PlanData<T::BlockNumber, BalanceOf<T>, T::AccountId>),
 	}
 
 	#[pallet::error]
 	pub enum Error<T> {
-		InvalidSubscription,
+		InvalidAmount,
+		InvalidFrequency,
+		InvalidNumberOfInstalment,
+		CannotSubscribeToSelf,
 		IndexOutOfBounds,
 		NoSubscriptionPlannedAtBlock,
 		CallerIsNotSubscriber,
@@ -158,29 +165,31 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		#[pallet::weight(1_000)]
+		#[pallet::weight(0)]
 		pub fn subscribe(
 			origin: OriginFor<T>,
 			to: T::AccountId,
 			amount: BalanceOf<T>,
 			frequency: T::BlockNumber,
-			number_of_installment: Option<u32>,
+			number_of_instalment: Option<u32>,
 		) -> DispatchResult {
 			let from = ensure_signed(origin)?;
 
+			ensure!(!frequency.is_zero(), Error::<T>::InvalidFrequency);
+			ensure!(!amount.is_zero(), Error::<T>::InvalidAmount);
 			ensure!(
-				!frequency.is_zero()
-					&& !amount.is_zero() && match number_of_installment {
+				match number_of_instalment {
 					Some(x) => x >= 1,
 					None => true,
-				} && to != from,
-				Error::<T>::InvalidSubscription
+				},
+				Error::<T>::InvalidNumberOfInstalment
 			);
+			ensure!(to != from, Error::<T>::CannotSubscribeToSelf);
 
 			let subscription = InstalmentData {
 				frequency,
 				amount,
-				remaining_payments: number_of_installment,
+				remaining_payments: number_of_instalment,
 				beneficiary: to,
 				payer: from,
 			};
@@ -193,7 +202,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::weight(1_000)]
+		#[pallet::weight(0)]
 		pub fn unsubscribe(
 			origin: OriginFor<T>,
 			when: T::BlockNumber,
@@ -227,6 +236,46 @@ pub mod pallet {
 			<Subscriptions<T>>::insert(when, instalments);
 
 			Self::deposit_event(Event::Unsubscription(subscription_data));
+
+			Ok(())
+		}
+
+		#[pallet::weight(0)]
+		pub fn create_plan(
+			origin: OriginFor<T>,
+			amount: BalanceOf<T>,
+			frequency: T::BlockNumber,
+			number_of_instalment: Option<u32>,
+			metadata: BoundedVec<u8, T::MaxMetadataLength>,
+		) -> DispatchResult {
+			let beneficiary = ensure_signed(origin)?;
+
+			ensure!(!frequency.is_zero(), Error::<T>::InvalidFrequency);
+			ensure!(!amount.is_zero(), Error::<T>::InvalidAmount);
+			ensure!(
+				match number_of_instalment {
+					Some(x) => x >= 1,
+					None => true,
+				},
+				Error::<T>::InvalidNumberOfInstalment
+			);
+
+			let id = Self::plan_nonce();
+
+			<Plans<T>>::insert(
+				id,
+				(
+					PlanData {
+						frequency,
+						amount,
+						remaining_payments: number_of_instalment,
+						beneficiary,
+					},
+					metadata,
+				),
+			);
+
+			<PlanNonce<T>>::set(id + 1);
 
 			Ok(())
 		}
