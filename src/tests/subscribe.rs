@@ -1,5 +1,5 @@
 use super::mock::*;
-use crate::Error;
+use crate::{Error, InstalmentData};
 use frame_support::{assert_noop, assert_ok};
 
 #[test]
@@ -17,13 +17,17 @@ fn subscribe() {
 			number_of_installment
 		));
 
-		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
-			ALICE(),
-			BOB(),
-			amount,
+		let expected_instalment = InstalmentData {
 			frequency,
-			number_of_installment,
-		));
+			amount,
+			remaining_payments: number_of_installment,
+			beneficiary: BOB(),
+			payer: ALICE(),
+		};
+		assert!(PalletSubscription::subscriptions(2).contains(&expected_instalment));
+
+		let expected_event =
+			Event::PalletSubscription(crate::Event::Subscription(expected_instalment));
 		let received_event = &System::events()[0].event;
 
 		assert_eq!(*received_event, expected_event);
@@ -101,13 +105,17 @@ fn subscribe_multiple_events() {
 			number_of_installment
 		));
 
-		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
-			ALICE(),
-			BOB(),
-			amount,
+		let expected_instalment = InstalmentData {
 			frequency,
-			number_of_installment,
-		));
+			amount,
+			remaining_payments: number_of_installment,
+			beneficiary: BOB(),
+			payer: ALICE(),
+		};
+		assert!(PalletSubscription::subscriptions(2).contains(&expected_instalment));
+
+		let expected_event =
+			Event::PalletSubscription(crate::Event::Subscription(expected_instalment));
 		let received_event = &System::events()[0].event;
 
 		assert_eq!(*received_event, expected_event);
@@ -126,13 +134,17 @@ fn subscribe_multiple_events() {
 			number_of_installment
 		));
 
-		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
-			CHARLIE(),
-			PAUL(),
-			amount,
+		let expected_instalment = InstalmentData {
 			frequency,
-			number_of_installment,
-		));
+			amount,
+			remaining_payments: number_of_installment,
+			beneficiary: PAUL(),
+			payer: CHARLIE(),
+		};
+		assert!(PalletSubscription::subscriptions(2).contains(&expected_instalment));
+
+		let expected_event =
+			Event::PalletSubscription(crate::Event::Subscription(expected_instalment));
 		let received_event = &System::events()[1].event;
 
 		assert_eq!(*received_event, expected_event);
@@ -214,13 +226,17 @@ fn subscribe_number_of_installment_none() {
 			number_of_installment
 		));
 
-		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
-			ALICE(),
-			BOB(),
-			amount,
+		let expected_instalment = InstalmentData {
 			frequency,
-			number_of_installment,
-		));
+			amount,
+			remaining_payments: number_of_installment,
+			beneficiary: BOB(),
+			payer: ALICE(),
+		};
+		assert!(PalletSubscription::subscriptions(2).contains(&expected_instalment));
+
+		let expected_event =
+			Event::PalletSubscription(crate::Event::Subscription(expected_instalment));
 		let received_event = &System::events()[0].event;
 
 		assert_eq!(*received_event, expected_event);

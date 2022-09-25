@@ -1,6 +1,6 @@
 use super::mock::*;
-use crate::{Error, Subscription};
-use frame_support::{assert_noop, assert_ok};
+use crate::InstalmentData;
+use frame_support::assert_ok;
 
 #[test]
 fn trigger_hook_once_transfer_funds() {
@@ -60,19 +60,13 @@ fn infinite_subscription() {
 			bob_balance_before + amount * 101
 		);
 		let subscriptions_to_come = PalletSubscription::subscriptions(2 + frequency * 101);
-		assert!(
-			subscriptions_to_come
-				.expect("Should contain the reinserted subscription")
-				.contains(&(
-					Subscription {
-						frequency,
-						amount,
-						remaining_payments: recurence,
-						beneficiary,
-					},
-					ALICE()
-				))
-		)
+		assert!(subscriptions_to_come.contains(&InstalmentData {
+			frequency,
+			amount,
+			remaining_payments: recurence,
+			beneficiary,
+			payer: ALICE(),
+		},))
 	})
 }
 
@@ -102,19 +96,13 @@ fn caped_instalment_subscription() {
 		);
 		assert_eq!(Balances::free_balance(&BOB()), bob_balance_before + amount);
 		let subscriptions_to_come = PalletSubscription::subscriptions(2 + frequency);
-		assert!(
-			subscriptions_to_come
-				.expect("Should contain the reinserted subscription")
-				.contains(&(
-					Subscription {
-						frequency,
-						amount,
-						remaining_payments: Some(recurence.unwrap() - 1),
-						beneficiary,
-					},
-					ALICE()
-				))
-		);
+		assert!(subscriptions_to_come.contains(&InstalmentData {
+			frequency,
+			amount,
+			remaining_payments: Some(recurence.unwrap() - 1),
+			beneficiary,
+			payer: ALICE(),
+		},));
 
 		run_to_block(2 + frequency * (recurence.unwrap() as u64 - 1));
 		assert_eq!(
@@ -127,7 +115,7 @@ fn caped_instalment_subscription() {
 		);
 		let subscriptions_to_come =
 			PalletSubscription::subscriptions(2 + frequency * recurence.unwrap() as u64);
-		assert!(subscriptions_to_come.is_none())
+		assert!(subscriptions_to_come.is_empty())
 	})
 }
 
@@ -168,6 +156,6 @@ fn transfer_failed() {
 
 		// Won't be executed anymore
 		let subscriptions_to_come = PalletSubscription::subscriptions(2 + frequency * 10);
-		assert!(subscriptions_to_come.is_none())
+		assert!(subscriptions_to_come.is_empty())
 	})
 }

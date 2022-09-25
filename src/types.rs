@@ -11,9 +11,10 @@ pub type PlanId = u64;
 pub type SubscriptionId = u64;
 
 #[derive(Clone, Encode, Decode, TypeInfo, PartialEq, Eq, Debug, MaxEncodedLen)]
-pub struct Subscription<BlockNumber, Balance, AccountId> {
+pub struct InstalmentData<BlockNumber, Balance, AccountId> {
 	pub frequency: BlockNumber,
 	pub amount: Balance,
 	pub remaining_payments: Option<u32>,
 	pub beneficiary: AccountId,
+	pub payer: AccountId,
 }

@@ -1,5 +1,5 @@
 use super::mock::*;
-use crate::{Error, Subscription};
+use crate::{Error, InstalmentData};
 use frame_support::{assert_noop, assert_ok};
 
 #[test]
@@ -18,13 +18,17 @@ fn unsubscribe() {
 			number_of_installment
 		));
 
-		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
-			ALICE(),
-			BOB(),
-			amount,
+		let expected_instalment = InstalmentData {
 			frequency,
-			number_of_installment,
-		));
+			amount,
+			remaining_payments: number_of_installment,
+			beneficiary: BOB(),
+			payer: ALICE(),
+		};
+		assert!(PalletSubscription::subscriptions(2).contains(&expected_instalment));
+
+		let expected_event =
+			Event::PalletSubscription(crate::Event::Subscription(expected_instalment));
 		let received_event = &System::events()[0].event;
 
 		assert_eq!(*received_event, expected_event);
@@ -33,12 +37,6 @@ fn unsubscribe() {
 
 		let remaining_payments = number_of_installment;
 
-		let subscription = Subscription {
-			frequency,
-			amount,
-			remaining_payments,
-			beneficiary: BOB(),
-		};
 		let when = <frame_system::Pallet<TestRuntime>>::block_number() + 1;
 		let index: u32 = 0;
 
@@ -48,8 +46,15 @@ fn unsubscribe() {
 			index
 		));
 
-		let expected_event =
-			Event::PalletSubscription(crate::Event::Unsubscription(subscription, ALICE()));
+		let subscription = InstalmentData {
+			frequency,
+			amount,
+			remaining_payments,
+			beneficiary: BOB(),
+			payer: ALICE(),
+		};
+		assert!(!PalletSubscription::subscriptions(when).contains(&subscription));
+		let expected_event = Event::PalletSubscription(crate::Event::Unsubscription(subscription));
 		let received_event = &System::events()[1].event;
 
 		assert_eq!(*received_event, expected_event);
@@ -60,7 +65,6 @@ fn unsubscribe() {
 fn unsubscribe_no_subscriptions_found() {
 	ExternalityBuilder::default().build().execute_with(|| {
 		let origin = Origin::signed(ALICE());
-
 		let when = 1000;
 		let index: u32 = 0;
 
@@ -88,13 +92,17 @@ fn unsubscribe_invalid_when() {
 			number_of_installment
 		));
 
-		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
-			ALICE(),
-			BOB(),
-			amount,
+		let expected_instalment = InstalmentData {
 			frequency,
-			number_of_installment,
-		));
+			amount,
+			remaining_payments: number_of_installment,
+			beneficiary: BOB(),
+			payer: ALICE(),
+		};
+		assert!(PalletSubscription::subscriptions(2).contains(&expected_instalment));
+
+		let expected_event =
+			Event::PalletSubscription(crate::Event::Subscription(expected_instalment));
 		let received_event = &System::events()[0].event;
 
 		assert_eq!(*received_event, expected_event);
@@ -128,13 +136,16 @@ fn unsubscribe_index_out_of_bounds() {
 			number_of_installment
 		));
 
-		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
-			ALICE(),
-			BOB(),
-			amount,
+		let expected_instalment = InstalmentData {
 			frequency,
-			number_of_installment,
-		));
+			amount,
+			remaining_payments: number_of_installment,
+			beneficiary: BOB(),
+			payer: ALICE(),
+		};
+		assert!(PalletSubscription::subscriptions(2).contains(&expected_instalment));
+		let expected_event =
+			Event::PalletSubscription(crate::Event::Subscription(expected_instalment));
 		let received_event = &System::events()[0].event;
 
 		assert_eq!(*received_event, expected_event);
@@ -167,14 +178,17 @@ fn unsubscribe_wrong_subscriber() {
 			frequency,
 			number_of_installment
 		));
-
-		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
-			ALICE(),
-			BOB(),
-			amount,
+		let expected_instalment = InstalmentData {
 			frequency,
-			number_of_installment,
-		));
+			amount,
+			remaining_payments: number_of_installment,
+			beneficiary: BOB(),
+			payer: ALICE(),
+		};
+		assert!(PalletSubscription::subscriptions(2).contains(&expected_instalment));
+
+		let expected_event =
+			Event::PalletSubscription(crate::Event::Subscription(expected_instalment));
 		let received_event = &System::events()[0].event;
 
 		assert_eq!(*received_event, expected_event);
