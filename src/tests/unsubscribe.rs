@@ -4,31 +4,23 @@ use frame_support::{assert_noop, assert_ok};
 
 #[test]
 fn unsubscribe() {
-	ExternalityBuilder::build().execute_with(|| {
+	ExternalityBuilder::default().build().execute_with(|| {
 		// Starting subscription
-
-		const ALICE: u64 = 1;
-		const BOB: u64 = 2;
-
-		let origin = Origin::signed(ALICE);
-		let from = ALICE;
-		let to = BOB;
-
 		let amount = 4000;
 		let frequency = 5;
 		let number_of_installment = Some(4);
 
 		assert_ok!(PalletSubscription::subscribe(
-			origin.clone(),
-			to,
+			Origin::signed(ALICE()),
+			BOB(),
 			amount,
 			frequency,
 			number_of_installment
 		));
 
 		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
-			from,
-			to,
+			ALICE(),
+			BOB(),
 			amount,
 			frequency,
 			number_of_installment,
@@ -45,15 +37,19 @@ fn unsubscribe() {
 			frequency,
 			amount,
 			remaining_payments,
-			beneficiary: to,
+			beneficiary: BOB(),
 		};
 		let when = <frame_system::Pallet<TestRuntime>>::block_number() + 1;
 		let index: u32 = 0;
 
-		assert_ok!(PalletSubscription::unsubscribe(origin, when, index));
+		assert_ok!(PalletSubscription::unsubscribe(
+			Origin::signed(ALICE()),
+			when,
+			index
+		));
 
 		let expected_event =
-			Event::PalletSubscription(crate::Event::Unsubscription(subscription, from));
+			Event::PalletSubscription(crate::Event::Unsubscription(subscription, ALICE()));
 		let received_event = &System::events()[1].event;
 
 		assert_eq!(*received_event, expected_event);
@@ -62,10 +58,8 @@ fn unsubscribe() {
 
 #[test]
 fn unsubscribe_no_subscriptions_found() {
-	ExternalityBuilder::build().execute_with(|| {
-		const ALICE: u64 = 1;
-
-		let origin = Origin::signed(ALICE);
+	ExternalityBuilder::default().build().execute_with(|| {
+		let origin = Origin::signed(ALICE());
 
 		let when = 1000;
 		let index: u32 = 0;
@@ -79,31 +73,24 @@ fn unsubscribe_no_subscriptions_found() {
 
 #[test]
 fn unsubscribe_invalid_when() {
-	ExternalityBuilder::build().execute_with(|| {
+	ExternalityBuilder::default().build().execute_with(|| {
 		// Starting subscription
-
-		const ALICE: u64 = 1;
-		const BOB: u64 = 2;
-
-		let origin = Origin::signed(ALICE);
-		let from = ALICE;
-		let to = BOB;
 
 		let amount = 4000;
 		let frequency = 5;
 		let number_of_installment = Some(4);
 
 		assert_ok!(PalletSubscription::subscribe(
-			origin.clone(),
-			to,
+			Origin::signed(ALICE()),
+			BOB(),
 			amount,
 			frequency,
 			number_of_installment
 		));
 
 		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
-			from,
-			to,
+			ALICE(),
+			BOB(),
 			amount,
 			frequency,
 			number_of_installment,
@@ -118,7 +105,7 @@ fn unsubscribe_invalid_when() {
 		let index: u32 = 0;
 
 		assert_noop!(
-			PalletSubscription::unsubscribe(origin, when, index),
+			PalletSubscription::unsubscribe(Origin::signed(ALICE()), when, index),
 			Error::<TestRuntime>::NoSubscriptionPlannedAtBlock
 		);
 	})
@@ -126,31 +113,24 @@ fn unsubscribe_invalid_when() {
 
 #[test]
 fn unsubscribe_index_out_of_bounds() {
-	ExternalityBuilder::build().execute_with(|| {
+	ExternalityBuilder::default().build().execute_with(|| {
 		// Starting subscription
-
-		const ALICE: u64 = 1;
-		const BOB: u64 = 2;
-
-		let origin = Origin::signed(ALICE);
-		let from = ALICE;
-		let to = BOB;
 
 		let amount = 4000;
 		let frequency = 5;
 		let number_of_installment = Some(4);
 
 		assert_ok!(PalletSubscription::subscribe(
-			origin.clone(),
-			to,
+			Origin::signed(ALICE()),
+			BOB(),
 			amount,
 			frequency,
 			number_of_installment
 		));
 
 		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
-			from,
-			to,
+			ALICE(),
+			BOB(),
 			amount,
 			frequency,
 			number_of_installment,
@@ -165,7 +145,7 @@ fn unsubscribe_index_out_of_bounds() {
 		let when = <frame_system::Pallet<TestRuntime>>::block_number() + 1;
 
 		assert_noop!(
-			PalletSubscription::unsubscribe(origin, when, index),
+			PalletSubscription::unsubscribe(Origin::signed(ALICE()), when, index),
 			Error::<TestRuntime>::IndexOutOfBounds
 		);
 	})
@@ -173,31 +153,24 @@ fn unsubscribe_index_out_of_bounds() {
 
 #[test]
 fn unsubscribe_wrong_subscriber() {
-	ExternalityBuilder::build().execute_with(|| {
+	ExternalityBuilder::default().build().execute_with(|| {
 		// Starting subscription
-
-		const ALICE: u64 = 1;
-		const BOB: u64 = 2;
-
-		let origin = Origin::signed(ALICE);
-		let from = ALICE;
-		let to = BOB;
 
 		let amount = 4000;
 		let frequency = 5;
 		let number_of_installment = Some(4);
 
 		assert_ok!(PalletSubscription::subscribe(
-			origin,
-			to,
+			Origin::signed(ALICE()),
+			BOB(),
 			amount,
 			frequency,
 			number_of_installment
 		));
 
 		let expected_event = Event::PalletSubscription(crate::Event::Subscription(
-			from,
-			to,
+			ALICE(),
+			BOB(),
 			amount,
 			frequency,
 			number_of_installment,
@@ -206,11 +179,7 @@ fn unsubscribe_wrong_subscriber() {
 
 		assert_eq!(*received_event, expected_event);
 
-		// ALICE has been subscribed to BOB.
-
-		const THOMAS: u64 = 100;
-
-		let wrong_origin = Origin::signed(THOMAS);
+		let wrong_origin = Origin::signed(CHARLIE());
 
 		let when = <frame_system::Pallet<TestRuntime>>::block_number() + 1;
 		let index: u32 = 0;

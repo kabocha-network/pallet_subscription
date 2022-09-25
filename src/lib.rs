@@ -32,9 +32,15 @@ pub mod pallet {
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
 		/// The trait to manage funds
 		type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
+		/// Weight information for extrinsics in this pallet.
+		// type WeightInfo: WeightInfo;
 		/// The maximum amount of metadata
 		#[pallet::constant]
 		type MaxMetadataLength: Get<u32>;
+		/// The maximum weight that may be scheduled per block for any dispatchables of less
+		/// priority than `schedule::HARD_DEADLINE`.
+		#[pallet::constant]
+		type MaximumWeight: Get<Weight>;
 	}
 
 	#[pallet::pallet]
@@ -100,43 +106,67 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(block_number: T::BlockNumber) -> Weight {
-			let mut weight = T::DbWeight::get().reads(1 as Weight);
+			let limit = T::MaximumWeight::get();
+			let mut total_weight: Weight = 0;
 
-			if let Some(subscriptions) = Self::subscriptions(block_number) {
-				for (sub, who) in subscriptions {
-					let _ = T::Currency::transfer(
-						&who,
-						&sub.beneficiary,
-						sub.amount,
-						ExistenceRequirement::KeepAlive,
-					);
-					// TODO: add weight for `transfer`
+			let mut scheduled_subscriptions = match <Subscriptions<T>>::take(block_number) {
+				Some(s) => s,
+				None => return total_weight,
+			};
+			total_weight += T::DbWeight::get().reads_writes(1 as Weight, 1 as Weight);
 
-					if let Some(1) = sub.remaining_payments {
-						continue
-					}
+			while total_weight < limit {
+				let (sub_info, from) = match scheduled_subscriptions.pop() {
+					Some(data) => data,
+					None => break,
+				};
 
-					match sub.remaining_payments {
-						Some(remaining_payments) => {
-							Self::schedule_subscription(
-								block_number + sub.frequency,
+				let _ = T::Currency::transfer(
+					&from,
+					&sub_info.beneficiary,
+					sub_info.amount,
+					ExistenceRequirement::KeepAlive,
+				);
+				// TODO: benchmark what cost a call to transfer and add it to total_weight
+				// For now let's use this
+				total_weight += T::DbWeight::get().reads_writes(1 as Weight, 1 as Weight);
+
+				if let Some(1) = sub_info.remaining_payments {
+					continue
+				}
+
+				match sub_info.remaining_payments {
+					Some(remaining_payments) => {
+						Self::schedule_subscriptions(
+							block_number + sub_info.frequency,
+							&[(
 								Subscription {
 									remaining_payments: Some(remaining_payments - 1),
-									..sub
+									..sub_info
 								},
-								who,
-							);
-						},
-						None => {
-							Self::schedule_subscription(block_number + sub.frequency, sub, who);
-						},
-					}
-
-					weight += T::DbWeight::get().writes(1 as Weight);
+								from,
+							)],
+						);
+					},
+					None => {
+						Self::schedule_subscriptions(
+							block_number + sub_info.frequency,
+							&[(sub_info, from)],
+						);
+					},
 				}
-			};
 
-			weight
+				total_weight += T::DbWeight::get().writes(1 as Weight);
+			}
+
+			if !scheduled_subscriptions.is_empty() {
+				Self::schedule_subscriptions(
+					block_number + T::BlockNumber::from(1u32),
+					&scheduled_subscriptions,
+				);
+			}
+
+			total_weight
 		}
 	}
 
@@ -170,7 +200,7 @@ pub mod pallet {
 
 			let next_block_number = <frame_system::Pallet<T>>::block_number() + 1u32.into();
 
-			Self::schedule_subscription(next_block_number, subscription, from);
+			Self::schedule_subscriptions(next_block_number, &[(subscription, from.clone())]);
 
 			Self::deposit_event(Event::Subscription(
 				from,
@@ -218,16 +248,18 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
-		fn schedule_subscription(
+		fn schedule_subscriptions(
 			when: T::BlockNumber,
-			new_subscription: Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
-			from: T::AccountId,
+			new_subscription: &[(
+				Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
+				T::AccountId,
+			)],
 		) {
 			<Subscriptions<T>>::mutate(when, |wrapped_current_subscriptions| {
 				if let Some(current_subscriptions) = wrapped_current_subscriptions {
-					current_subscriptions.push((new_subscription, from));
+					current_subscriptions.extend_from_slice(new_subscription);
 				} else {
-					*wrapped_current_subscriptions = Some(vec![(new_subscription, from)]);
+					*wrapped_current_subscriptions = Some(new_subscription.to_vec());
 				}
 			});
 		}
