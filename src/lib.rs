@@ -99,14 +99,44 @@ pub mod pallet {
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-		fn on_initialize(_n: T::BlockNumber) -> Weight {
-			//// prop 1:
-			// - loop over all subscriptions (.iter_values())
-			// - check if the subscription shoud be taken
-			// - take it
+		fn on_initialize(block_number: T::BlockNumber) -> Weight {
+			let mut weight = T::DbWeight::get().reads(1 as Weight);
 
-			//// prop 2: (2nd key: )
-			0
+			if let Some(subscriptions) = Self::subscriptions(block_number) {
+				for (sub, who) in subscriptions {
+					let _ = T::Currency::transfer(
+						&who,
+						&sub.beneficiary,
+						sub.amount,
+						ExistenceRequirement::KeepAlive,
+					);
+					// TODO: add weight for `transfer`
+
+					if let Some(1) = sub.remaining_payments {
+						continue
+					}
+
+					match sub.remaining_payments {
+						Some(remaining_payments) => {
+							Self::schedule_subscription(
+								block_number + sub.frequency,
+								Subscription {
+									remaining_payments: Some(remaining_payments - 1),
+									..sub
+								},
+								who,
+							);
+						},
+						None => {
+							Self::schedule_subscription(block_number + sub.frequency, sub, who);
+						},
+					}
+
+					weight += T::DbWeight::get().writes(1 as Weight);
+				}
+			};
+
+			weight
 		}
 	}
 
@@ -138,17 +168,9 @@ pub mod pallet {
 				beneficiary: to.clone(),
 			};
 
-			let new_subscription = (subscription, from.clone());
-
 			let next_block_number = <frame_system::Pallet<T>>::block_number() + 1u32.into();
 
-			<Subscriptions<T>>::mutate(next_block_number, |wrapped_current_subscriptions| {
-				if let Some(current_subscriptions) = wrapped_current_subscriptions {
-					current_subscriptions.push(new_subscription);
-				} else {
-					*wrapped_current_subscriptions = Some(vec![new_subscription]);
-				}
-			});
+			Self::schedule_subscription(next_block_number, subscription, from);
 
 			Self::deposit_event(Event::Subscription(
 				from,
@@ -192,6 +214,22 @@ pub mod pallet {
 				}
 			})?;
 			Ok(())
+		}
+	}
+
+	impl<T: Config> Pallet<T> {
+		fn schedule_subscription(
+			when: T::BlockNumber,
+			new_subscription: Subscription<T::BlockNumber, BalanceOf<T>, T::AccountId>,
+			from: T::AccountId,
+		) {
+			<Subscriptions<T>>::mutate(when, |wrapped_current_subscriptions| {
+				if let Some(current_subscriptions) = wrapped_current_subscriptions {
+					current_subscriptions.push((new_subscription, from));
+				} else {
+					*wrapped_current_subscriptions = Some(vec![(new_subscription, from)]);
+				}
+			});
 		}
 	}
 }
