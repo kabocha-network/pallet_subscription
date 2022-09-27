@@ -50,7 +50,7 @@ fn invalid_amount() {
 				amount,
 				frequency,
 				recurence,
-				metadata.clone()
+				metadata
 			),
 			Error::<TestRuntime>::InvalidAmount
 		);
@@ -71,7 +71,7 @@ fn invalid_frequency() {
 				amount,
 				frequency,
 				recurence,
-				metadata.clone()
+				metadata
 			),
 			Error::<TestRuntime>::InvalidFrequency
 		);
@@ -92,7 +92,7 @@ fn invalid_number_of_instalment() {
 				amount,
 				frequency,
 				recurence,
-				metadata.clone()
+				metadata
 			),
 			Error::<TestRuntime>::InvalidNumberOfInstalment
 		);

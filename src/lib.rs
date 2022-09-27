@@ -65,6 +65,11 @@ pub mod pallet {
 	>;
 
 	#[pallet::storage]
+	#[pallet::getter(fn are_subscriptions_closed)]
+	pub type AreSubscriptionsClosed<T: Config> =
+		StorageMap<_, Twox64Concat, PlanId, bool, ValueQuery>;
+
+	#[pallet::storage]
 	#[pallet::unbounded]
 	#[pallet::getter(fn subscriptions)]
 	pub type Subscriptions<T: Config> = StorageMap<
@@ -92,6 +97,9 @@ pub mod pallet {
 		IndexOutOfBounds,
 		NoSubscriptionPlannedAtBlock,
 		CallerIsNotSubscriber,
+		PlanDoesNotExist,
+		MustBeOwner,
+		SubscriptionsAreClosed,
 	}
 
 	#[pallet::hooks]
@@ -275,6 +283,45 @@ pub mod pallet {
 
 			Ok(())
 		}
+
+		#[pallet::weight(0)]
+		pub fn delete_plan(origin: OriginFor<T>, plan_id: PlanId) -> DispatchResult {
+			let sender = ensure_signed(origin)?;
+
+			let (plan, _) = Self::plans(plan_id).ok_or(Error::<T>::PlanDoesNotExist)?;
+
+			ensure!(plan.beneficiary == sender, Error::<T>::MustBeOwner);
+
+			Self::remove_plan_from_storage(plan_id);
+
+			Ok(())
+		}
+
+		#[pallet::weight(0)]
+		pub fn close_subscriptions(origin: OriginFor<T>, plan_id: PlanId) -> DispatchResult {
+			let sender = ensure_signed(origin)?;
+
+			let (plan, _) = Self::plans(plan_id).ok_or(Error::<T>::PlanDoesNotExist)?;
+
+			ensure!(plan.beneficiary == sender, Error::<T>::MustBeOwner);
+
+			<AreSubscriptionsClosed<T>>::insert(plan_id, true);
+
+			Ok(())
+		}
+
+		#[pallet::weight(0)]
+		pub fn open_subscriptions(origin: OriginFor<T>, plan_id: PlanId) -> DispatchResult {
+			let sender = ensure_signed(origin)?;
+
+			let (plan, _) = Self::plans(plan_id).ok_or(Error::<T>::PlanDoesNotExist)?;
+
+			ensure!(plan.beneficiary == sender, Error::<T>::MustBeOwner);
+
+			<AreSubscriptionsClosed<T>>::insert(plan_id, false);
+
+			Ok(())
+		}
 	}
 
 	impl<T: Config> Pallet<T> {
@@ -285,6 +332,11 @@ pub mod pallet {
 			<Subscriptions<T>>::mutate(when, |current_subscriptions| {
 				current_subscriptions.extend_from_slice(new_subscription);
 			});
+		}
+
+		fn remove_plan_from_storage(plan_id: PlanId) {
+			<Plans<T>>::remove(plan_id);
+			<AreSubscriptionsClosed<T>>::remove(plan_id);
 		}
 	}
 }
