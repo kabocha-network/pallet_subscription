@@ -52,7 +52,7 @@ pub mod pallet {
 	pub type PlanNonce<T: Config> = StorageValue<_, PlanId, ValueQuery>;
 
 	#[pallet::storage]
-	#[pallet::getter(fn subscription_plans)]
+	#[pallet::getter(fn plans)]
 	pub type Plans<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
@@ -63,10 +63,6 @@ pub mod pallet {
 		),
 		OptionQuery,
 	>;
-
-	#[pallet::storage]
-	#[pallet::getter(fn subscription_nonce)]
-	pub type SubscriptionNonce<T: Config> = StorageValue<_, SubscriptionId, ValueQuery>;
 
 	#[pallet::storage]
 	#[pallet::unbounded]

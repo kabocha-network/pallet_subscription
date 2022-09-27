@@ -1,5 +1,5 @@
 use super::mock::*;
-use crate::{Error, InstalmentData};
+use crate::{Error, Event as SubscriptionEvent, InstalmentData};
 use frame_support::{assert_noop, assert_ok};
 
 #[test]
@@ -27,7 +27,7 @@ fn subscribe() {
 		assert!(PalletSubscription::subscriptions(2).contains(&expected_instalment));
 
 		let expected_event =
-			Event::PalletSubscription(crate::Event::Subscription(expected_instalment));
+			Event::PalletSubscription(SubscriptionEvent::Subscription(expected_instalment));
 		let received_event = &System::events()[0].event;
 
 		assert_eq!(*received_event, expected_event);
@@ -61,7 +61,7 @@ fn subscribe_multiple_events() {
 		assert!(PalletSubscription::subscriptions(2).contains(&expected_instalment));
 
 		let expected_event =
-			Event::PalletSubscription(crate::Event::Subscription(expected_instalment));
+			Event::PalletSubscription(SubscriptionEvent::Subscription(expected_instalment));
 		let received_event = &System::events()[0].event;
 
 		assert_eq!(*received_event, expected_event);
@@ -90,7 +90,7 @@ fn subscribe_multiple_events() {
 		assert!(PalletSubscription::subscriptions(2).contains(&expected_instalment));
 
 		let expected_event =
-			Event::PalletSubscription(crate::Event::Subscription(expected_instalment));
+			Event::PalletSubscription(SubscriptionEvent::Subscription(expected_instalment));
 		let received_event = &System::events()[1].event;
 
 		assert_eq!(*received_event, expected_event);
@@ -182,7 +182,7 @@ fn subscribe_number_of_installment_none() {
 		assert!(PalletSubscription::subscriptions(2).contains(&expected_instalment));
 
 		let expected_event =
-			Event::PalletSubscription(crate::Event::Subscription(expected_instalment));
+			Event::PalletSubscription(SubscriptionEvent::Subscription(expected_instalment));
 		let received_event = &System::events()[0].event;
 
 		assert_eq!(*received_event, expected_event);
