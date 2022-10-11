@@ -5,186 +5,119 @@ use frame_support::{assert_noop, assert_ok};
 #[test]
 fn subscribe() {
 	ExternalityBuilder::default().build().execute_with(|| {
-		let amount = 4000;
-		let frequency = 5;
-		let number_of_instalment = Some(4);
+		let number_of_instalments = Some(4);
 
-		assert_ok!(PalletSubscription::subscribe(
+		assert_ok!(PalletSubscription::create_plan(
+			Origin::signed(BOB()),
+			4000,
+			5,
+			number_of_instalments,
+			vec![].try_into().unwrap(),
+		));
+
+		let plan_id = 0.into();
+
+		assert_ok!(PalletSubscription::subscribe_to_plan(
 			Origin::signed(ALICE()),
-			BOB(),
-			amount,
-			frequency,
-			number_of_instalment
+			plan_id,
 		));
 
 		let expected_instalment = InstalmentData {
-			frequency,
-			amount,
-			remaining_payments: number_of_instalment,
-			beneficiary: BOB(),
+			subscription_id: plan_id.into(),
+			remaining_payments: number_of_instalments,
 			payer: ALICE(),
 		};
-		assert!(PalletSubscription::subscriptions(2).contains(&expected_instalment));
+		assert!(PalletSubscription::active_subscriptions(2).contains(&expected_instalment));
 
 		let expected_event =
-			Event::PalletSubscription(SubscriptionEvent::Subscription(expected_instalment));
-		let received_event = &System::events()[0].event;
-
+			Event::PalletSubscription(SubscriptionEvent::Subscription(ALICE(), plan_id.into()));
+		let received_event = &System::events()[1].event;
 		assert_eq!(*received_event, expected_event);
 	})
 }
 
 #[test]
-fn subscribe_multiple_events() {
+fn subscribe_multiple_events_ok() {
 	ExternalityBuilder::default().build().execute_with(|| {
 		// Subscription n1 - ALICE() BOB() BOB()
 
-		let amount = 4000;
-		let frequency = 5;
-		let number_of_instalment = Some(4);
+		let number_of_instalments = Some(4);
 
-		assert_ok!(PalletSubscription::subscribe(
+		assert_ok!(PalletSubscription::create_plan(
+			Origin::signed(BOB()),
+			4000,
+			5,
+			number_of_instalments,
+			vec![].try_into().unwrap(),
+		));
+
+		let plan_id = 0.into();
+
+		assert_ok!(PalletSubscription::subscribe_to_plan(
 			Origin::signed(ALICE()),
-			BOB(),
-			amount,
-			frequency,
-			number_of_instalment
+			plan_id,
 		));
 
 		let expected_instalment = InstalmentData {
-			frequency,
-			amount,
-			remaining_payments: number_of_instalment,
-			beneficiary: BOB(),
+			subscription_id: plan_id.into(),
+			remaining_payments: number_of_instalments,
 			payer: ALICE(),
 		};
-		assert!(PalletSubscription::subscriptions(2).contains(&expected_instalment));
+		assert!(PalletSubscription::active_subscriptions(2).contains(&expected_instalment));
 
 		let expected_event =
-			Event::PalletSubscription(SubscriptionEvent::Subscription(expected_instalment));
-		let received_event = &System::events()[0].event;
-
+			Event::PalletSubscription(SubscriptionEvent::Subscription(ALICE(), plan_id.into()));
+		let received_event = &System::events()[1].event;
 		assert_eq!(*received_event, expected_event);
 
 		// Subscription n2 - CHARLIE BOB() PAUL
 
-		let amount = 6000;
-		let frequency = 7;
-		let number_of_instalment = Some(4);
+		let number_of_instalments = Some(4);
 
-		assert_ok!(PalletSubscription::subscribe(
+		assert_ok!(PalletSubscription::subscribe_to_plan(
 			Origin::signed(CHARLIE()),
-			PAUL(),
-			amount,
-			frequency,
-			number_of_instalment
+			plan_id,
 		));
 
 		let expected_instalment = InstalmentData {
-			frequency,
-			amount,
-			remaining_payments: number_of_instalment,
-			beneficiary: PAUL(),
+			subscription_id: plan_id.into(),
+			remaining_payments: number_of_instalments,
 			payer: CHARLIE(),
 		};
-		assert!(PalletSubscription::subscriptions(2).contains(&expected_instalment));
+		assert!(PalletSubscription::active_subscriptions(2).contains(&expected_instalment));
 
 		let expected_event =
-			Event::PalletSubscription(SubscriptionEvent::Subscription(expected_instalment));
-		let received_event = &System::events()[1].event;
+			Event::PalletSubscription(SubscriptionEvent::Subscription(CHARLIE(), plan_id.into()));
+		let received_event = &System::events()[2].event;
 
 		assert_eq!(*received_event, expected_event);
 	})
 }
 
 #[test]
-fn subscribe_frequency_zero() {
+fn plan_does_not_exist() {
 	ExternalityBuilder::default().build().execute_with(|| {
-		let amount = 400;
-		let frequency = 0;
-		let number_of_instalment = Some(4);
-
 		assert_noop!(
-			PalletSubscription::subscribe(
-				Origin::signed(ALICE()),
-				BOB(),
-				amount,
-				frequency,
-				number_of_instalment
-			),
-			Error::<TestRuntime>::InvalidFrequency
+			PalletSubscription::subscribe_to_plan(Origin::signed(ALICE()), 0.into(),),
+			Error::<TestRuntime>::PlanDoesNotExist
 		);
 	})
 }
 
 #[test]
-fn subscribe_amount_zero() {
+fn cannot_subscribe_to_self() {
 	ExternalityBuilder::default().build().execute_with(|| {
-		let amount = 0;
-		let frequency = 5;
-		let number_of_instalment = Some(4);
-
-		assert_noop!(
-			PalletSubscription::subscribe(
-				Origin::signed(ALICE()),
-				BOB(),
-				amount,
-				frequency,
-				number_of_instalment
-			),
-			Error::<TestRuntime>::InvalidAmount
-		);
-	})
-}
-
-#[test]
-fn subscribe_instalments_zero() {
-	ExternalityBuilder::default().build().execute_with(|| {
-		let amount = 400;
-		let frequency = 10;
-		let number_of_instalment = Some(0);
-
-		assert_noop!(
-			PalletSubscription::subscribe(
-				Origin::signed(ALICE()),
-				BOB(),
-				amount,
-				frequency,
-				number_of_instalment
-			),
-			Error::<TestRuntime>::InvalidNumberOfInstalment
-		);
-	})
-}
-
-#[test]
-fn subscribe_number_of_installment_none() {
-	ExternalityBuilder::default().build().execute_with(|| {
-		let amount = 2000;
-		let frequency = 4;
-		let number_of_instalment = None;
-
-		assert_ok!(PalletSubscription::subscribe(
+		assert_ok!(PalletSubscription::create_plan(
 			Origin::signed(ALICE()),
-			BOB(),
-			amount,
-			frequency,
-			number_of_instalment
+			4000,
+			5,
+			Some(4),
+			vec![].try_into().unwrap(),
 		));
 
-		let expected_instalment = InstalmentData {
-			frequency,
-			amount,
-			remaining_payments: number_of_instalment,
-			beneficiary: BOB(),
-			payer: ALICE(),
-		};
-		assert!(PalletSubscription::subscriptions(2).contains(&expected_instalment));
-
-		let expected_event =
-			Event::PalletSubscription(SubscriptionEvent::Subscription(expected_instalment));
-		let received_event = &System::events()[0].event;
-
-		assert_eq!(*received_event, expected_event);
+		assert_noop!(
+			PalletSubscription::subscribe_to_plan(Origin::signed(ALICE()), 0.into(),),
+			Error::<TestRuntime>::CannotSubscribeToSelf,
+		);
 	})
 }

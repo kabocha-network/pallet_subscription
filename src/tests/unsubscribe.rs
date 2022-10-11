@@ -6,39 +6,34 @@ use frame_support::{assert_noop, assert_ok};
 fn unsubscribe() {
 	ExternalityBuilder::default().build().execute_with(|| {
 		// Starting subscription
-		let amount = 4000;
-		let frequency = 5;
-		let number_of_installment = Some(4);
+		let number_of_instalments = Some(4);
 
-		assert_ok!(PalletSubscription::subscribe(
-			Origin::signed(ALICE()),
-			BOB(),
-			amount,
-			frequency,
-			number_of_installment
+		assert_ok!(PalletSubscription::create_plan(
+			Origin::signed(BOB()),
+			4000,
+			5,
+			number_of_instalments,
+			vec![].try_into().unwrap(),
 		));
 
-		let expected_instalment = InstalmentData {
-			frequency,
-			amount,
-			remaining_payments: number_of_installment,
-			beneficiary: BOB(),
-			payer: ALICE(),
-		};
-		assert!(PalletSubscription::subscriptions(2).contains(&expected_instalment));
+		let plan_id = 0.into();
 
-		let expected_event =
-			Event::PalletSubscription(crate::Event::Subscription(expected_instalment));
-		let received_event = &System::events()[0].event;
-
-		assert_eq!(*received_event, expected_event);
+		assert_ok!(PalletSubscription::subscribe_to_plan(
+			Origin::signed(ALICE()),
+			plan_id,
+		));
 
 		// ALICE has been subscribed to BOB.
 
-		let remaining_payments = number_of_installment;
-
 		let when = <frame_system::Pallet<TestRuntime>>::block_number() + 1;
 		let index: u32 = 0;
+		let instalment_data = InstalmentData {
+			subscription_id: plan_id.into(),
+			remaining_payments: number_of_instalments,
+			payer: ALICE(),
+		};
+
+		assert!(PalletSubscription::active_subscriptions(when).contains(&instalment_data));
 
 		assert_ok!(PalletSubscription::unsubscribe(
 			Origin::signed(ALICE()),
@@ -46,23 +41,16 @@ fn unsubscribe() {
 			index
 		));
 
-		let subscription = InstalmentData {
-			frequency,
-			amount,
-			remaining_payments,
-			beneficiary: BOB(),
-			payer: ALICE(),
-		};
-		assert!(!PalletSubscription::subscriptions(when).contains(&subscription));
-		let expected_event = Event::PalletSubscription(crate::Event::Unsubscription(subscription));
-		let received_event = &System::events()[1].event;
-
+		assert!(!PalletSubscription::active_subscriptions(when).contains(&instalment_data));
+		let expected_event =
+			Event::PalletSubscription(crate::Event::Unsubscription(ALICE(), plan_id.into()));
+		let received_event = &System::events()[2].event;
 		assert_eq!(*received_event, expected_event);
 	})
 }
 
 #[test]
-fn unsubscribe_no_subscriptions_found() {
+fn no_subscription_planned_at_block() {
 	ExternalityBuilder::default().build().execute_with(|| {
 		let origin = Origin::signed(ALICE());
 		let when = 1000;
@@ -76,79 +64,21 @@ fn unsubscribe_no_subscriptions_found() {
 }
 
 #[test]
-fn unsubscribe_invalid_when() {
+fn index_out_of_bounds() {
 	ExternalityBuilder::default().build().execute_with(|| {
 		// Starting subscription
-
-		let amount = 4000;
-		let frequency = 5;
-		let number_of_installment = Some(4);
-
-		assert_ok!(PalletSubscription::subscribe(
-			Origin::signed(ALICE()),
-			BOB(),
-			amount,
-			frequency,
-			number_of_installment
+		assert_ok!(PalletSubscription::create_plan(
+			Origin::signed(BOB()),
+			4000,
+			5,
+			Some(4),
+			vec![].try_into().unwrap(),
 		));
 
-		let expected_instalment = InstalmentData {
-			frequency,
-			amount,
-			remaining_payments: number_of_installment,
-			beneficiary: BOB(),
-			payer: ALICE(),
-		};
-		assert!(PalletSubscription::subscriptions(2).contains(&expected_instalment));
-
-		let expected_event =
-			Event::PalletSubscription(crate::Event::Subscription(expected_instalment));
-		let received_event = &System::events()[0].event;
-
-		assert_eq!(*received_event, expected_event);
-
-		// ALICE has been subscribed to BOB.
-
-		let when = 1000;
-		let index: u32 = 0;
-
-		assert_noop!(
-			PalletSubscription::unsubscribe(Origin::signed(ALICE()), when, index),
-			Error::<TestRuntime>::NoSubscriptionPlannedAtBlock
-		);
-	})
-}
-
-#[test]
-fn unsubscribe_index_out_of_bounds() {
-	ExternalityBuilder::default().build().execute_with(|| {
-		// Starting subscription
-
-		let amount = 4000;
-		let frequency = 5;
-		let number_of_installment = Some(4);
-
-		assert_ok!(PalletSubscription::subscribe(
+		assert_ok!(PalletSubscription::subscribe_to_plan(
 			Origin::signed(ALICE()),
-			BOB(),
-			amount,
-			frequency,
-			number_of_installment
+			0.into(),
 		));
-
-		let expected_instalment = InstalmentData {
-			frequency,
-			amount,
-			remaining_payments: number_of_installment,
-			beneficiary: BOB(),
-			payer: ALICE(),
-		};
-		assert!(PalletSubscription::subscriptions(2).contains(&expected_instalment));
-		let expected_event =
-			Event::PalletSubscription(crate::Event::Subscription(expected_instalment));
-		let received_event = &System::events()[0].event;
-
-		assert_eq!(*received_event, expected_event);
 
 		// ALICE has been subscribed to BOB.
 
@@ -163,44 +93,29 @@ fn unsubscribe_index_out_of_bounds() {
 }
 
 #[test]
-fn unsubscribe_wrong_subscriber() {
+fn callet_is_not_payer() {
 	ExternalityBuilder::default().build().execute_with(|| {
 		// Starting subscription
-
-		let amount = 4000;
-		let frequency = 5;
-		let number_of_installment = Some(4);
-
-		assert_ok!(PalletSubscription::subscribe(
-			Origin::signed(ALICE()),
-			BOB(),
-			amount,
-			frequency,
-			number_of_installment
+		assert_ok!(PalletSubscription::create_plan(
+			Origin::signed(BOB()),
+			4000,
+			5,
+			Some(4),
+			vec![].try_into().unwrap(),
 		));
-		let expected_instalment = InstalmentData {
-			frequency,
-			amount,
-			remaining_payments: number_of_installment,
-			beneficiary: BOB(),
-			payer: ALICE(),
-		};
-		assert!(PalletSubscription::subscriptions(2).contains(&expected_instalment));
 
-		let expected_event =
-			Event::PalletSubscription(crate::Event::Subscription(expected_instalment));
-		let received_event = &System::events()[0].event;
-
-		assert_eq!(*received_event, expected_event);
+		assert_ok!(PalletSubscription::subscribe_to_plan(
+			Origin::signed(ALICE()),
+			0.into(),
+		));
 
 		let wrong_origin = Origin::signed(CHARLIE());
-
 		let when = <frame_system::Pallet<TestRuntime>>::block_number() + 1;
 		let index: u32 = 0;
 
 		assert_noop!(
 			PalletSubscription::unsubscribe(wrong_origin, when, index),
-			Error::<TestRuntime>::CallerIsNotSubscriber
+			Error::<TestRuntime>::CallerIsNotPayer
 		);
 	})
 }

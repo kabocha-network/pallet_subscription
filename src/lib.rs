@@ -49,20 +49,36 @@ pub mod pallet {
 
 	#[pallet::storage]
 	#[pallet::getter(fn plan_nonce)]
-	pub type PlanNonce<T: Config> = StorageValue<_, PlanId, ValueQuery>;
+	pub type PlanNonce<T: Config> = StorageValue<_, u64, ValueQuery>;
 
 	#[pallet::storage]
-	#[pallet::getter(fn plans)]
-	pub type Plans<T: Config> = StorageMap<
+	#[pallet::getter(fn subscription_to_user_nonce)]
+	pub type SubscriptionToUserNonce<T: Config> = StorageValue<_, u64, ValueQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn subscription_plan)]
+	pub type SubscriptionPlan<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
 		PlanId,
-		(
-			PlanData<T::BlockNumber, BalanceOf<T>, T::AccountId>,
-			BoundedVec<u8, T::MaxMetadataLength>,
-		),
+		PlanData<T::BlockNumber, BalanceOf<T>, T::AccountId>,
 		OptionQuery,
 	>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn subscription_to_user)]
+	pub type SubscriptionToUser<T: Config> = StorageMap<
+		_,
+		Twox64Concat,
+		SubscriptionToUserId,
+		PlanData<T::BlockNumber, BalanceOf<T>, T::AccountId>,
+		OptionQuery,
+	>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn plan_metadata)]
+	pub type PlanMetadata<T: Config> =
+		StorageMap<_, Twox64Concat, PlanId, BoundedVec<u8, T::MaxMetadataLength>, OptionQuery>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn are_subscriptions_closed)]
@@ -71,21 +87,24 @@ pub mod pallet {
 
 	#[pallet::storage]
 	#[pallet::unbounded]
-	#[pallet::getter(fn subscriptions)]
-	pub type Subscriptions<T: Config> = StorageMap<
-		_,
-		Twox64Concat,
-		T::BlockNumber,
-		Vec<InstalmentData<T::BlockNumber, BalanceOf<T>, T::AccountId>>,
-		ValueQuery,
-	>;
+	#[pallet::getter(fn active_subscriptions)]
+	pub type ActiveSubscriptions<T: Config> =
+		StorageMap<_, Twox64Concat, T::BlockNumber, Vec<InstalmentData<T::AccountId>>, ValueQuery>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		Subscription(InstalmentData<T::BlockNumber, BalanceOf<T>, T::AccountId>),
-		Unsubscription(InstalmentData<T::BlockNumber, BalanceOf<T>, T::AccountId>),
 		PlanCreated(PlanId, PlanData<T::BlockNumber, BalanceOf<T>, T::AccountId>),
+		PlanDeleted(PlanId),
+		PlanClosed(PlanId),
+		PlanOpened(PlanId),
+		Subscription(T::AccountId, SubscriptionId),
+		SubscriptionToUser(
+			T::AccountId,
+			PlanData<T::BlockNumber, BalanceOf<T>, T::AccountId>,
+			SubscriptionToUserId,
+		),
+		Unsubscription(T::AccountId, SubscriptionId),
 	}
 
 	#[pallet::error]
@@ -96,8 +115,9 @@ pub mod pallet {
 		CannotSubscribeToSelf,
 		IndexOutOfBounds,
 		NoSubscriptionPlannedAtBlock,
-		CallerIsNotSubscriber,
+		CallerIsNotPayer,
 		PlanDoesNotExist,
+		PlanIdMustBeSome,
 		MustBeOwner,
 		SubscriptionsAreClosed,
 	}
@@ -108,7 +128,7 @@ pub mod pallet {
 			let limit = T::MaximumWeight::get();
 			let mut total_weight: Weight = 0;
 
-			let mut scheduled_subscriptions = <Subscriptions<T>>::take(block_number);
+			let mut scheduled_subscriptions = <ActiveSubscriptions<T>>::take(block_number);
 			total_weight += T::DbWeight::get().reads_writes(1 as Weight, 1 as Weight);
 
 			while total_weight < limit {
@@ -117,10 +137,16 @@ pub mod pallet {
 					None => return total_weight,
 				};
 
+				total_weight += T::DbWeight::get().reads(1 as Weight);
+				let plan_data = match Self::get_plan_form_id(sub_info.subscription_id) {
+					Ok(data) => data,
+					Err(_) => continue,
+				};
+
 				let res_transfer = T::Currency::transfer(
 					&sub_info.payer,
-					&sub_info.beneficiary,
-					sub_info.amount,
+					&plan_data.beneficiary,
+					plan_data.amount,
 					ExistenceRequirement::KeepAlive,
 				);
 				// TODO: benchmark what costs a call to transfer and add it to total_weight
@@ -138,7 +164,7 @@ pub mod pallet {
 				match sub_info.remaining_payments {
 					Some(remaining_payments) => {
 						Self::schedule_subscriptions(
-							block_number + sub_info.frequency,
+							block_number + plan_data.frequency,
 							&[InstalmentData {
 								remaining_payments: Some(remaining_payments - 1),
 								..sub_info
@@ -147,7 +173,7 @@ pub mod pallet {
 					},
 					None => {
 						Self::schedule_subscriptions(
-							block_number + sub_info.frequency,
+							block_number + plan_data.frequency,
 							&[sub_info],
 						);
 					},
@@ -170,39 +196,161 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		#[pallet::weight(0)]
-		pub fn subscribe(
+		pub fn create_plan(
+			origin: OriginFor<T>,
+			amount: BalanceOf<T>,
+			frequency: T::BlockNumber,
+			number_of_instalments: Option<u32>,
+			metadata: BoundedVec<u8, T::MaxMetadataLength>,
+		) -> DispatchResult {
+			let beneficiary = ensure_signed(origin)?;
+
+			ensure!(!frequency.is_zero(), Error::<T>::InvalidFrequency);
+			ensure!(!amount.is_zero(), Error::<T>::InvalidAmount);
+			ensure!(
+				match number_of_instalments {
+					Some(x) => x >= 1,
+					None => true,
+				},
+				Error::<T>::InvalidNumberOfInstalment
+			);
+
+			let nonce = Self::plan_nonce();
+			<PlanNonce<T>>::set(nonce + 1);
+
+			let id: PlanId = nonce.into();
+			let plan_data = PlanData {
+				frequency,
+				amount,
+				number_of_instalments,
+				beneficiary,
+			};
+
+			<SubscriptionPlan<T>>::insert(id, plan_data.clone());
+			<PlanMetadata<T>>::insert(id, metadata);
+
+			Self::deposit_event(Event::PlanCreated(id, plan_data));
+
+			Ok(())
+		}
+
+		#[pallet::weight(0)]
+		pub fn delete_plan(origin: OriginFor<T>, plan_id: PlanId) -> DispatchResult {
+			let sender = ensure_signed(origin)?;
+
+			let plan = Self::subscription_plan(plan_id).ok_or(Error::<T>::PlanDoesNotExist)?;
+
+			ensure!(plan.beneficiary == sender, Error::<T>::MustBeOwner);
+
+			Self::remove_plan_from_storage(plan_id);
+
+			Self::deposit_event(Event::PlanDeleted(plan_id));
+
+			Ok(())
+		}
+
+		#[pallet::weight(0)]
+		pub fn close_plan(origin: OriginFor<T>, plan_id: PlanId) -> DispatchResult {
+			let sender = ensure_signed(origin)?;
+
+			let plan = Self::subscription_plan(plan_id).ok_or(Error::<T>::PlanDoesNotExist)?;
+
+			ensure!(plan.beneficiary == sender, Error::<T>::MustBeOwner);
+
+			<AreSubscriptionsClosed<T>>::insert(plan_id, true);
+
+			Self::deposit_event(Event::PlanClosed(plan_id));
+
+			Ok(())
+		}
+
+		#[pallet::weight(0)]
+		pub fn open_plan(origin: OriginFor<T>, plan_id: PlanId) -> DispatchResult {
+			let sender = ensure_signed(origin)?;
+
+			let plan = Self::subscription_plan(plan_id).ok_or(Error::<T>::PlanDoesNotExist)?;
+
+			ensure!(plan.beneficiary == sender, Error::<T>::MustBeOwner);
+
+			<AreSubscriptionsClosed<T>>::insert(plan_id, false);
+
+			Self::deposit_event(Event::PlanOpened(plan_id));
+
+			Ok(())
+		}
+
+		#[pallet::weight(0)]
+		pub fn subscribe_to_plan(origin: OriginFor<T>, plan_id: PlanId) -> DispatchResult {
+			let from = ensure_signed(origin)?;
+
+			let plan = Self::subscription_plan(plan_id).ok_or(Error::<T>::PlanDoesNotExist)?;
+			ensure!(plan.beneficiary != from, Error::<T>::CannotSubscribeToSelf);
+
+			let subscription_id = SubscriptionId::Plan(plan_id);
+
+			let next_block_number = <frame_system::Pallet<T>>::block_number() + 1u32.into();
+
+			Self::schedule_subscriptions(
+				next_block_number,
+				&[InstalmentData {
+					subscription_id,
+					remaining_payments: plan.number_of_instalments,
+					payer: from.clone(),
+				}],
+			);
+
+			Self::deposit_event(Event::Subscription(from, subscription_id));
+
+			Ok(())
+		}
+
+		#[pallet::weight(0)]
+		pub fn subscribe_to_account(
 			origin: OriginFor<T>,
 			to: T::AccountId,
 			amount: BalanceOf<T>,
 			frequency: T::BlockNumber,
-			number_of_instalment: Option<u32>,
+			number_of_instalments: Option<u32>,
 		) -> DispatchResult {
 			let from = ensure_signed(origin)?;
 
 			ensure!(!frequency.is_zero(), Error::<T>::InvalidFrequency);
 			ensure!(!amount.is_zero(), Error::<T>::InvalidAmount);
 			ensure!(
-				match number_of_instalment {
+				match number_of_instalments {
 					Some(x) => x >= 1,
 					None => true,
 				},
 				Error::<T>::InvalidNumberOfInstalment
 			);
-			ensure!(to != from, Error::<T>::CannotSubscribeToSelf);
+			ensure!(from != to, Error::<T>::CannotSubscribeToSelf);
 
-			let subscription = InstalmentData {
+			let nonce = Self::subscription_to_user_nonce();
+			<SubscriptionToUserNonce<T>>::set(nonce + 1);
+
+			let id: SubscriptionToUserId = nonce.into();
+			let plan_data = PlanData {
 				frequency,
 				amount,
-				remaining_payments: number_of_instalment,
+				number_of_instalments,
 				beneficiary: to,
-				payer: from,
 			};
+
+			<SubscriptionToUser<T>>::insert(id, plan_data.clone());
 
 			let next_block_number = <frame_system::Pallet<T>>::block_number() + 1u32.into();
 
-			Self::schedule_subscriptions(next_block_number, &[subscription.clone()]);
+			Self::schedule_subscriptions(
+				next_block_number,
+				&[InstalmentData {
+					subscription_id: id.into(),
+					remaining_payments: number_of_instalments,
+					payer: from.clone(),
+				}],
+			);
 
-			Self::deposit_event(Event::Subscription(subscription));
+			Self::deposit_event(Event::SubscriptionToUser(from, plan_data, id));
+
 			Ok(())
 		}
 
@@ -214,7 +362,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let from = ensure_signed(origin)?;
 
-			let mut instalments = Self::subscriptions(when);
+			let mut instalments = Self::active_subscriptions(when);
 			ensure!(
 				!instalments.is_empty(),
 				Error::<T>::NoSubscriptionPlannedAtBlock,
@@ -229,7 +377,7 @@ pub mod pallet {
 
 			ensure!(
 				desired_subscription.payer == from,
-				Error::<T>::CallerIsNotSubscriber,
+				Error::<T>::CallerIsNotPayer,
 			);
 
 			// Those two lines are safe because we checked index < length
@@ -237,88 +385,15 @@ pub mod pallet {
 			instalments.swap(index, length - 1);
 			let subscription_data = instalments.pop().unwrap();
 
-			<Subscriptions<T>>::insert(when, instalments);
+			<ActiveSubscriptions<T>>::insert(when, instalments);
+			if let SubscriptionId::User(id) = subscription_data.subscription_id {
+				<SubscriptionToUser<T>>::remove(id);
+			}
 
-			Self::deposit_event(Event::Unsubscription(subscription_data));
-
-			Ok(())
-		}
-
-		#[pallet::weight(0)]
-		pub fn create_plan(
-			origin: OriginFor<T>,
-			amount: BalanceOf<T>,
-			frequency: T::BlockNumber,
-			number_of_instalment: Option<u32>,
-			metadata: BoundedVec<u8, T::MaxMetadataLength>,
-		) -> DispatchResult {
-			let beneficiary = ensure_signed(origin)?;
-
-			ensure!(!frequency.is_zero(), Error::<T>::InvalidFrequency);
-			ensure!(!amount.is_zero(), Error::<T>::InvalidAmount);
-			ensure!(
-				match number_of_instalment {
-					Some(x) => x >= 1,
-					None => true,
-				},
-				Error::<T>::InvalidNumberOfInstalment
-			);
-
-			let id = Self::plan_nonce();
-
-			<Plans<T>>::insert(
-				id,
-				(
-					PlanData {
-						frequency,
-						amount,
-						remaining_payments: number_of_instalment,
-						beneficiary,
-					},
-					metadata,
-				),
-			);
-
-			<PlanNonce<T>>::set(id + 1);
-
-			Ok(())
-		}
-
-		#[pallet::weight(0)]
-		pub fn delete_plan(origin: OriginFor<T>, plan_id: PlanId) -> DispatchResult {
-			let sender = ensure_signed(origin)?;
-
-			let (plan, _) = Self::plans(plan_id).ok_or(Error::<T>::PlanDoesNotExist)?;
-
-			ensure!(plan.beneficiary == sender, Error::<T>::MustBeOwner);
-
-			Self::remove_plan_from_storage(plan_id);
-
-			Ok(())
-		}
-
-		#[pallet::weight(0)]
-		pub fn close_subscriptions(origin: OriginFor<T>, plan_id: PlanId) -> DispatchResult {
-			let sender = ensure_signed(origin)?;
-
-			let (plan, _) = Self::plans(plan_id).ok_or(Error::<T>::PlanDoesNotExist)?;
-
-			ensure!(plan.beneficiary == sender, Error::<T>::MustBeOwner);
-
-			<AreSubscriptionsClosed<T>>::insert(plan_id, true);
-
-			Ok(())
-		}
-
-		#[pallet::weight(0)]
-		pub fn open_subscriptions(origin: OriginFor<T>, plan_id: PlanId) -> DispatchResult {
-			let sender = ensure_signed(origin)?;
-
-			let (plan, _) = Self::plans(plan_id).ok_or(Error::<T>::PlanDoesNotExist)?;
-
-			ensure!(plan.beneficiary == sender, Error::<T>::MustBeOwner);
-
-			<AreSubscriptionsClosed<T>>::insert(plan_id, false);
+			Self::deposit_event(Event::Unsubscription(
+				from,
+				subscription_data.subscription_id,
+			));
 
 			Ok(())
 		}
@@ -327,16 +402,28 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		fn schedule_subscriptions(
 			when: T::BlockNumber,
-			new_subscription: &[InstalmentData<T::BlockNumber, BalanceOf<T>, T::AccountId>],
+			new_subscription: &[InstalmentData<T::AccountId>],
 		) {
-			<Subscriptions<T>>::mutate(when, |current_subscriptions| {
+			<ActiveSubscriptions<T>>::mutate(when, |current_subscriptions| {
 				current_subscriptions.extend_from_slice(new_subscription);
 			});
 		}
 
 		fn remove_plan_from_storage(plan_id: PlanId) {
-			<Plans<T>>::remove(plan_id);
+			<SubscriptionPlan<T>>::remove(plan_id);
+			<PlanMetadata<T>>::remove(plan_id);
 			<AreSubscriptionsClosed<T>>::remove(plan_id);
+		}
+
+		fn get_plan_form_id(
+			plan_id: SubscriptionId,
+		) -> Result<PlanData<T::BlockNumber, BalanceOf<T>, T::AccountId>, Error<T>> {
+			match plan_id {
+				SubscriptionId::None => Err(Error::<T>::PlanIdMustBeSome)?,
+				SubscriptionId::Plan(id) => Self::subscription_plan(id),
+				SubscriptionId::User(id) => Self::subscription_to_user(id),
+			}
+			.ok_or(Error::<T>::PlanDoesNotExist)
 		}
 	}
 }
